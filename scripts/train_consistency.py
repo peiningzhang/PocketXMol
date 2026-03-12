@@ -109,6 +109,20 @@ def _check_assembly_exists(dataset_cfg, mode="train"):
         )
 
 
+def _normalize_single_task_weight(task_entry, task_name: str):
+    """ForeverTaskDataset expects task-level probabilities to sum to 1."""
+    task_entry = copy.deepcopy(task_entry)
+    task_entry["weight"] = 1.0
+    db_ratio = dict(task_entry.get("db_ratio", {}))
+    if len(db_ratio) == 0:
+        raise ValueError(f"Task {task_name} has empty db_ratio.")
+    ratio_sum = float(sum(db_ratio.values()))
+    if ratio_sum <= 0:
+        raise ValueError(f"Task {task_name} has non-positive db_ratio sum: {ratio_sum}")
+    task_entry["db_ratio"] = {k: float(v) / ratio_sum for k, v in db_ratio.items()}
+    return task_entry
+
+
 def _build_train_loader(train_config, distill_cfg, logger):
     task_name = distill_cfg.task_name
     data_cfg = _apply_data_override(train_config, distill_cfg, task_name, logger)
@@ -133,7 +147,9 @@ def _build_train_loader(train_config, distill_cfg, logger):
 
     if task_name not in data_cfg.task_db_weights:
         raise KeyError(f"task_name={task_name} not found in train config task_db_weights.")
-    task_db_weights = {task_name: copy.deepcopy(data_cfg.task_db_weights[task_name])}
+    task_db_weights = {
+        task_name: _normalize_single_task_weight(data_cfg.task_db_weights[task_name], task_name)
+    }
 
     num_workers = int(getattr(distill_cfg.train, "num_workers", 2))
     dataset = ForeverTaskDataset(
