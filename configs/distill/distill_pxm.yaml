@@ -6,6 +6,9 @@ distill:
   student_checkpoint: ""
   resume: ""
   task_name: "sbdd"
+  data_override:
+    root: "./data_train"
+    assembly_path: "assemblies/split_reduced_assembly.lmdb"
   # Optional: override teacher train data path for current machine.
   # data_override:
   #   root: "/shared/healthinfolab/phz24002/PocketXMol/data"
@@ -55,12 +58,14 @@ distill:
     eval_interval: 10000
 
   wandb:
-    enabled: false
+    enabled: true
     project: "pocketxmol-consistency"
-    name: ""
+    name: "sbdd-distill-run1"
     entity: ""
     id: ""          # optional fixed run id
     resume: "allow" # allow | must | never
+
+
 
   online_eval:
     enabled: false
