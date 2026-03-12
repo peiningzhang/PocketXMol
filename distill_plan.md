@@ -17,6 +17,15 @@
 
 ## 3. 算法设计与损失函数 (Algorithm & Objectives)
 
+### 3.0 PocketXMol 的“混合状态一致性”定义 (Mixed-State Consistency)
+
+PocketXMol 的生成状态是混合变量：原子坐标为连续变量，而原子/键类型为离散变量。为避免把图像领域“连续时间 PF ODE + score”叙述生搬硬套到离散变量上，我们定义一致性模型的目标为：给定任意噪声水平的输入图状态 \((X_t, C_t)\) 与时间 \(t\)，学生模型直接预测干净终点态的**同一表征**：
+
+- **坐标头**：输出 \(\hat{X}_0\)（或等价的去噪坐标表征）
+- **类型头**：输出 \(\hat{C}_0\)（原子/键类型 logits 或概率分布）
+
+教师模型用于生成**相邻时间步对** \((\hat{x}^\phi_{t_n}, x_{t_{n+1}})\) 的“轨迹监督”。其中连续部分可通过一步 ODE solver 近似 PF ODE 轨迹点；离散部分则以教师在对应时间步的 logits/分布作为蒸馏目标（KL/CE），不强行引入不自然的离散 ODE。
+
 ### 3.1 一致性蒸馏基础损失 ($L_{CD}$)
 
 在直接一致性蒸馏中，我们使用预训练的 PocketXMol 作为教师网络来估计 ODE 轨迹，并训练一个学生网络 $f_\theta$。目标是最小化相邻时间步的一致性误差：
@@ -33,6 +42,18 @@ $$L_{type} = \mathbb{E} \left[ D_{KL} \left( f^{type}_{\theta^-}(\hat{x}_{t_n}, 
 
 
 *(注：$\theta^-$ 为学生网络的指数移动平均 (EMA) 权重，$\hat{x}_{t_n}$ 为教师模型从 $t_{n+1}$ 单步退化得到的状态)*
+
+### 3.1.1 学生模型接口约定 (Engineering Interface)
+
+为保证直接实现并复现实验，约定学生模型（及其 EMA 副本）输出统一的终点态预测：
+
+- 输入：`(graph_state_at_t, t)`，其中 `graph_state_at_t` 包含 `node_type/halfedge_type/node_pos` 等 PocketXMol 现有字段（与采样时 batch 的字段保持一致）
+- 输出：`pred_x0` 字典，至少包含：
+  - `pred_node_logits_x0`（原子类型 logits 或概率）
+  - `pred_halfedge_logits_x0`（键类型 logits 或概率）
+  - `pred_pos_x0`（去噪坐标）
+
+这样一致性损失可以统一写成“终点态预测之间的差异”，采样时也能直接用 \(\hat{x}_0\) 作为一步/少步生成的输出。
 
 ### 3.2 深度融合：联合物理惩罚损失 ($L_{Physics}$)
 
@@ -75,7 +96,9 @@ $$L_{total} = L_{pos} + \lambda_1 L_{node\_type} + \lambda_2 L_{edge\_type} + \l
 * **任务**:
 1. 加载预训练的 PocketXMol (Teacher，冻结参数)。
 2. 初始化 Student 模型及其 EMA (Exponential Moving Average) 副本。
-3. 编写 Heun Solver 或 Euler Solver 用于在时间步 $t_{n+1}$ 和 $t_n$ 之间生成教师引导的真实轨迹点 $\hat{x}_{t_n}$。
+3. 参考https://arxiv.org/pdf/2303.01469，复用 PocketXMol 的噪声日程与 time embedding 方式，固定一套时间网格 \(\{t_n\}\)（Karras 公式，\(\rho=7\)，给定 \(\epsilon, T\)），并实现“一步 teacher 轨迹点”生成：
+   - 连续坐标：用 Euler 或 Heun 对教师诱导的 PF ODE 做一步更新，得到 \(\hat{X}^\phi_{t_n}\)
+   - 离散类型：直接使用教师在 \(t_n\) / \(t_{n+1}\) 的 logits 分布作为蒸馏监督（KL/CE）
 
 
 
@@ -90,10 +113,10 @@ $$L_{total} = L_{pos} + \lambda_1 L_{node\_type} + \lambda_2 L_{edge\_type} + \l
 ### 阶段 3：单阶段直接蒸馏训练
 
 * **任务**:
-1. 固定一个离散时间步数 \(N\)（例如 100 或 200），按照 Karras 等人的公式一次性生成时间网格 \(\{t_n\}_{n=1}^N\)，在整个训练过程中 **不再动态增加或调整时间步**。
-2. 对于每个时间步对 \((t_n, t_{n+1})\)，从数据分布采样 \(x\)，按 SDE 的转移分布采样 \(x_{t_{n+1}}\)，再用一步 ODE（例如 Euler）在 PF ODE 上得到 \(\hat{x}^\phi_{t_n}\)，构造成对样本 \((\hat{x}^\phi_{t_n}, x_{t_{n+1}})\)。
-3. 用一致性损失（如 \(\|\mathcal{C}_\theta(\hat{x}^\phi_{t_n}, t_n) - \mathcal{C}_\theta(x_{t_{n+1}}, t_{n+1})\|\)）训练单个一致性模型 \(\mathcal{C}_\theta\)，实现从单步 ODE 解到多步采样的一次性蒸馏。
-4. 在训练过程中监控物理约束相关损失（如 \(L_{\text{Physics}}\)）和重构质量指标，验证蒸馏后的一致性模型在物化可行性与生成质量上的保持情况。
+1. 固定一个离散时间步数 \(N\)（例如 10/20/50；先小后大做对照），按照 Karras 等人的公式一次性生成时间网格 \(\{t_n\}_{n=1}^N\)，在整个训练过程中 **不再动态增加或调整时间步**。
+2. 每个 iteration **随机采样** 一个时间步索引 \(n \sim \mathcal{U}\{1,\dots,N-1\}\)（或按噪声权重采样），从数据分布采样 \(x\)，并按 SDE 转移采样 \(x_{t_{n+1}}\)。
+3. 用教师模型构造相邻对：根据一步 ODE solver 得到连续部分 \(\hat{X}^\phi_{t_n}\)，并取教师在对应时间步的离散 logits 作为类型监督，形成 \((\hat{x}^\phi_{t_n}, x_{t_{n+1}})\)。
+4. 用一致性损失训练单个一致性模型 \(\mathcal{C}_\theta\)（配合 EMA \(\theta^-\)），并加入 \(L_{\text{Physics}}\) 做联合约束。重点记录：训练稳定性（loss 曲线/梯度范数）、以及少步采样的有效性指标。
 
 
 ### 阶段 4：极速采样与全面评估
@@ -101,9 +124,10 @@ $$L_{total} = L_{pos} + \lambda_1 L_{node\_type} + \lambda_2 L_{edge\_type} + \l
 * **文件**: `scripts/eval_consistency.py`
 * **任务**:
 1. 使用训练好的学生模型执行 **1步、2步、4步、8步** 采样。
-2. 对比指标：
+2. 对比指标（形成“步数-质量-速度”对照表）：
+* **速度指标**：wall time / samples-per-second / GPU util（至少报告 wall time 与吞吐）。
 * **基础指标**：Vina Score (亲和力), QED, SA。
-* **验证指标 (证明 Motivation)**：Validity (化学键合法率), Steric Clashes Ratio (空间位阻率)。
+* **验证指标**：recon_success / complete / validity / connectivity / steric clashes（与你现有 `evaluate_sdf_standard.py` 对齐）。
 
 
 3. **Ablation Study (消融实验)**：对比去除 $L_{Physics}$ 的传统独立一致性蒸馏，证明“深度融合”在极速采样下的不可替代性。
