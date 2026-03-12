@@ -106,8 +106,8 @@ $$L_{total} = L_{pos} + \lambda_1 L_{node\_type} + \lambda_2 L_{edge\_type} + \l
 
 * **文件**: `models/consistency_loss.py`
 * **任务**:
-1. 实现连续变量的 MSE Loss 和离散变量的 KL Div Loss。
-2. **核心代码**：实现 `compute_joint_physics_loss`，构建 VdW 半径查找表，确保梯度可以通过物理距离计算反向传播至原子类型预测层和坐标预测层。
+1. 实现连续变量的 MSE Loss 和离散变量的 KL Div Loss，并与现有 PocketXMol 的损失实现保持接口兼容。
+2. （TODO，未来工作）实现 `compute_joint_physics_loss`：构建 VdW 半径查找表，确保梯度可以通过物理距离计算反向传播至原子类型预测层和坐标预测层；当前云端实验阶段暂不启用该项，只保留设计草案。
 
 
 ### 阶段 3：单阶段直接蒸馏训练
@@ -116,7 +116,11 @@ $$L_{total} = L_{pos} + \lambda_1 L_{node\_type} + \lambda_2 L_{edge\_type} + \l
 1. 固定一个离散时间步数 \(N\)（例如 10/20/50；先小后大做对照），按照 Karras 等人的公式一次性生成时间网格 \(\{t_n\}_{n=1}^N\)，在整个训练过程中 **不再动态增加或调整时间步**。
 2. 每个 iteration **随机采样** 一个时间步索引 \(n \sim \mathcal{U}\{1,\dots,N-1\}\)（或按噪声权重采样），从数据分布采样 \(x\)，并按 SDE 转移采样 \(x_{t_{n+1}}\)。
 3. 用教师模型构造相邻对：根据一步 ODE solver 得到连续部分 \(\hat{X}^\phi_{t_n}\)，并取教师在对应时间步的离散 logits 作为类型监督，形成 \((\hat{x}^\phi_{t_n}, x_{t_{n+1}})\)。
-4. 用一致性损失训练单个一致性模型 \(\mathcal{C}_\theta\)（配合 EMA \(\theta^-\)），并加入 \(L_{\text{Physics}}\) 做联合约束。重点记录：训练稳定性（loss 曲线/梯度范数）、以及少步采样的有效性指标。
+4. 用一致性损失训练单个一致性模型 \(\mathcal{C}_\theta\)（配合 EMA \(\theta^-\)），当前阶段**仅启用基础一致性损失**（连续 + 离散），\(L_{\text{Physics}}\) 保留为后续扩展选项，避免一次性引入过多不稳定因素。
+5. 将蒸馏训练全流程接入 **Weights & Biases (wandb)**：
+   - 记录 loss 曲线、学习率、梯度范数等训练日志；
+   - 配置统一的 `wandb.run` meta 信息（teacher ckpt、数据集、time grid 配置等），方便不同云任务对比。
+6. 在训练过程中，每隔固定 step（例如每 **10000 step**）自动触发一次小规模评估：使用当前学生模型对 sbdd 测试集上的 protein target 进行采样，每个 target 生成 **1 个 ligand**，共生成约 **100 个 ligand**，并同步其 vina/QED/SA/validity 等 summary 指标到 wandb，作为在线 early stopping / model selection 信号。
 
 
 ### 阶段 4：极速采样与全面评估
