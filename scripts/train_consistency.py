@@ -226,7 +226,56 @@ def _reduce_batch_for_oom(batch):
     return reduced
 
 
-def _save_distill_ckpt(path, step, student, ema_student, optimizer, config, transitions):
+def _wandb_meta_from_run(wandb_run):
+    if wandb_run is None:
+        return None
+    return {
+        "run_id": wandb_run.id,
+        "name": wandb_run.name,
+        "url": wandb_run.url,
+        "project": wandb_run.project,
+        "entity": wandb_run.entity,
+    }
+
+
+def _init_wandb_run(distill_cfg, config, logger, log_dir, resume_ckpt=None):
+    wandb_cfg = getattr(distill_cfg, "wandb", EasyDict())
+    use_wandb = bool(getattr(wandb_cfg, "enabled", False))
+    if not use_wandb:
+        return None
+
+    try:
+        import wandb
+    except Exception as exc:
+        logger.warning("wandb init failed, fallback to no-wandb: %s", exc)
+        return None
+
+    run_id = getattr(wandb_cfg, "id", "")
+    if (not run_id) and (resume_ckpt is not None):
+        run_id = (resume_ckpt.get("wandb") or {}).get("run_id", "")
+    run_id = run_id if run_id else None
+
+    init_kwargs = {
+        "project": getattr(wandb_cfg, "project", "pocketxmol-consistency"),
+        "name": getattr(wandb_cfg, "name", None),
+        "config": to_plain_dict(config),
+        "dir": log_dir,
+    }
+    entity = getattr(wandb_cfg, "entity", "")
+    if entity:
+        init_kwargs["entity"] = entity
+
+    if run_id is not None:
+        resume_mode = getattr(wandb_cfg, "resume", "allow")
+        init_kwargs.update({"id": run_id, "resume": resume_mode})
+        logger.info("Initializing wandb with resume: id=%s mode=%s", run_id, resume_mode)
+    else:
+        logger.info("Initializing new wandb run.")
+
+    return wandb.init(**init_kwargs)
+
+
+def _save_distill_ckpt(path, step, student, ema_student, optimizer, config, transitions, wandb_meta=None):
     ckpt = {
         "step": step,
         "student": student.state_dict(),
@@ -235,6 +284,7 @@ def _save_distill_ckpt(path, step, student, ema_student, optimizer, config, tran
         "config": to_plain_dict(config),
         "sigmas": transitions["sigmas"].detach().cpu(),
         "betas": transitions["betas"].detach().cpu(),
+        "wandb": wandb_meta,
         "saved_at": datetime.now().isoformat(),
     }
     torch.save(ckpt, path)
@@ -293,21 +343,6 @@ def main():
     logger.info("Config: %s", args.config)
     logger.info("Output: %s", log_dir)
     save_config(config, os.path.join(log_dir, os.path.basename(args.config)))
-
-    use_wandb = bool(getattr(distill_cfg, "wandb", {}).get("enabled", False))
-    wandb_run = None
-    if use_wandb:
-        try:
-            import wandb
-
-            wandb_run = wandb.init(
-                project=getattr(distill_cfg.wandb, "project", "pocketxmol-consistency"),
-                name=getattr(distill_cfg.wandb, "name", None),
-                config=to_plain_dict(config),
-            )
-        except Exception as exc:
-            logger.warning("wandb init failed, fallback to no-wandb: %s", exc)
-            wandb_run = None
 
     teacher_ckpt = distill_cfg.teacher_checkpoint
     teacher_train_cfg_path = getattr(distill_cfg, "teacher_train_config", "")
@@ -382,6 +417,7 @@ def main():
     ema_decay = float(getattr(distill_cfg, "ema_decay", 0.999))
 
     start_step = 1
+    ckpt = None
     resume_path = args.resume or getattr(distill_cfg, "resume", "")
     if resume_path:
         logger.info("Resuming from %s", resume_path)
@@ -391,6 +427,14 @@ def main():
         if "optimizer" in ckpt:
             optimizer.load_state_dict(ckpt["optimizer"])
         start_step = int(ckpt.get("step", 0)) + 1
+
+    wandb_run = _init_wandb_run(
+        distill_cfg=distill_cfg,
+        config=config,
+        logger=logger,
+        log_dir=log_dir,
+        resume_ckpt=ckpt,
+    )
 
     prog = tqdm(range(start_step, max_steps + 1), desc="Consistency Distill")
     for step in prog:
@@ -534,8 +578,20 @@ def main():
 
         if step % ckpt_interval == 0 or step == max_steps:
             step_ckpt = os.path.join(ckpt_dir, f"step_{step}.pt")
-            _save_distill_ckpt(step_ckpt, step, student, ema_student, optimizer, config, transitions)
-            _save_distill_ckpt(os.path.join(ckpt_dir, "last.pt"), step, student, ema_student, optimizer, config, transitions)
+            wandb_meta = _wandb_meta_from_run(wandb_run)
+            _save_distill_ckpt(
+                step_ckpt, step, student, ema_student, optimizer, config, transitions, wandb_meta=wandb_meta
+            )
+            _save_distill_ckpt(
+                os.path.join(ckpt_dir, "last.pt"),
+                step,
+                student,
+                ema_student,
+                optimizer,
+                config,
+                transitions,
+                wandb_meta=wandb_meta,
+            )
             logger.info("Saved checkpoint to %s", step_ckpt)
 
         if step % eval_interval == 0 and step > 0:

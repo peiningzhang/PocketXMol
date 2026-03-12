@@ -58,6 +58,9 @@ distill:
     enabled: false
     project: "pocketxmol-consistency"
     name: ""
+    entity: ""
+    id: ""          # optional fixed run id
+    resume: "allow" # allow | must | never
 
   online_eval:
     enabled: false
