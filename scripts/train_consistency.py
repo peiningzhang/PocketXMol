@@ -151,25 +151,34 @@ def _build_train_loader(train_config, distill_cfg, logger):
         task_name: _normalize_single_task_weight(data_cfg.task_db_weights[task_name], task_name)
     }
 
-    num_workers = int(getattr(distill_cfg.train, "num_workers", 2))
+    loader_num_workers = int(getattr(distill_cfg.train, "num_workers", 2))
+    # ForeverTaskDataset internally uses num_workers to split sampler shards.
+    # Keep at least one shard even when DataLoader workers are set to 0.
+    sampler_num_workers = max(loader_num_workers, 1)
+    if loader_num_workers == 0:
+        logger.info("DataLoader num_workers=0, use sampler_num_workers=1 to avoid zero shard.")
     dataset = ForeverTaskDataset(
         data_cfg.dataset,
         task_db_weights,
         mode="train",
         transforms=transforms,
         shuffle=True,
-        num_workers=num_workers,
+        num_workers=sampler_num_workers,
         global_rank=0,
         world_size=1,
     )
     loader = DataLoader(
         dataset,
         batch_size=int(distill_cfg.train.batch_size),
-        num_workers=num_workers,
+        num_workers=loader_num_workers,
         pin_memory=bool(getattr(distill_cfg.train, "pin_memory", True)),
         follow_batch=follow_batch,
         exclude_keys=exclude_keys,
-        persistent_workers=bool(getattr(distill_cfg.train, "persistent_workers", num_workers > 0)) if num_workers > 0 else False,
+        persistent_workers=(
+            bool(getattr(distill_cfg.train, "persistent_workers", loader_num_workers > 0))
+            if loader_num_workers > 0
+            else False
+        ),
     )
     logger.info("Built distill train loader for task=%s", task_name)
     return loader, in_dims
