@@ -24,7 +24,7 @@ PocketXMol 的生成状态是混合变量：原子坐标为连续变量，而原
 - **坐标头**：输出 \(\hat{X}_0\)（或等价的去噪坐标表征）
 - **类型头**：输出 \(\hat{C}_0\)（原子/键类型 logits 或概率分布）
 
-教师模型用于生成**相邻时间步对** \((\hat{x}^\phi_{t_n}, x_{t_{n+1}})\) 的“轨迹监督”。其中连续部分可通过一步 ODE solver 近似 PF ODE 轨迹点；离散部分则以教师在对应时间步的 logits/分布作为蒸馏目标（KL/CE），不强行引入不自然的离散 ODE。
+教师模型用于构造**教师引导的一步相邻状态对** \((state_{t_{n+1}}, \widehat{state}_{t_n})\)，其中 \(\widehat{state}_{t_n}\) 是从 \(state_{t_{n+1}}\) 通过“单步降噪/回推”得到、可作为 EMA 学生网络输入的 \(t_n\) 状态。注意：教师仅用于构造 \(\widehat{state}_{t_n}\)（即“如何从 \(t_{n+1}\) 回到 \(t_n\)”），一致性训练的匹配对象仍然是 **EMA 学生网络输出**，而不是直接拟合教师 logits（避免退化为 KD）。
 
 ### 3.1 一致性蒸馏基础损失 ($L_{CD}$)
 
@@ -42,6 +42,17 @@ $$L_{type} = \mathbb{E} \left[ D_{KL} \left( f^{type}_{\theta^-}(\hat{x}_{t_n}, 
 
 
 *(注：$\theta^-$ 为学生网络的指数移动平均 (EMA) 权重，$\hat{x}_{t_n}$ 为教师模型从 $t_{n+1}$ 单步退化得到的状态)*
+
+#### 3.1.1 离散变量的“相邻轨迹点”构造：后验采样 (Categorical Posterior Step)
+
+一致性训练要求：EMA 学生网络在 \(t_n\) 的输入必须是一个“真实可用的” \(state_{t_n}\)。因此对于离散类型 \(C_t\)，不能跳过过渡直接算 loss；必须先从 \(C_{t_{n+1}}\) 构造出一个 \(C_{t_n}\) 作为 EMA 网络输入。推荐使用 PocketXMol 的离散扩散转移（categorical transition）对应的**真实后验**做一次更新：
+
+1. 给定 \(state_{t_{n+1}}=(X_{t_{n+1}}, C_{t_{n+1}})\)，教师网络预测 \((\hat{X}_0^{teacher}, \hat{C}_0^{teacher})\)（\(\hat{C}_0\) 为 logits/概率）。
+2. **连续部分**：基于教师诱导的 PF ODE，用 Euler/Heun 做一步得到 \(\hat{X}_{t_n}\)。
+3. **离散部分**：用后验 \(q(C_{t_n}\mid C_{t_{n+1}}, \hat{C}_0^{teacher})\) 采样/取期望得到 \(\hat{C}_{t_n}\)。
+4. 组装 \(\widehat{state}_{t_n}=(\hat{X}_{t_n}, \hat{C}_{t_n})\) 并输入给 EMA 学生网络 \(f_{\theta^-}\)。
+
+> 备注：教师只用于生成 \(\widehat{state}_{t_n}\) 所需的 \(\hat{C}_0^{teacher}\)（以及连续回推所需量）；离散一致性 loss 的匹配对象是 EMA 学生输出，而非教师输出（见下文的工程接口与 loss 定义）。
 
 ### 3.1.1 学生模型接口约定 (Engineering Interface)
 
@@ -96,9 +107,10 @@ $$L_{total} = L_{pos} + \lambda_1 L_{node\_type} + \lambda_2 L_{edge\_type} + \l
 * **任务**:
 1. 加载预训练的 PocketXMol (Teacher，冻结参数)。
 2. 初始化 Student 模型及其 EMA (Exponential Moving Average) 副本。
-3. 参考https://arxiv.org/pdf/2303.01469，复用 PocketXMol 的噪声日程与 time embedding 方式，固定一套时间网格 \(\{t_n\}\)（Karras 公式，\(\rho=7\)，给定 \(\epsilon, T\)），并实现“一步 teacher 轨迹点”生成：
-   - 连续坐标：用 Euler 或 Heun 对教师诱导的 PF ODE 做一步更新，得到 \(\hat{X}^\phi_{t_n}\)
-   - 离散类型：直接使用教师在 \(t_n\) / \(t_{n+1}\) 的 logits 分布作为蒸馏监督（KL/CE）
+3. 参考 CM 蒸馏流程，复用 PocketXMol 的噪声日程与 time embedding 方式，固定一套时间网格 \(\{t_n\}\)（Karras 公式，\(\rho=7\)，给定 \(\epsilon, T\)），并实现“教师引导的一步相邻点构造” \((state_{t_{n+1}}, \widehat{state}_{t_n})\)：
+   - 连续坐标：用 Euler/Heun 在教师诱导的 PF ODE 上回推一步得到 \(\hat{X}_{t_n}\)；
+   - 离散类型：用离散扩散的后验 \(q(C_{t_n}\mid C_{t_{n+1}}, \hat{C}_0^{teacher})\) 更新得到 \(\hat{C}_{t_n}\)；
+   - 将 \(\widehat{state}_{t_n}=(\hat{X}_{t_n},\hat{C}_{t_n})\) 输入给 EMA 学生网络，并用于一致性 loss（不直接拟合教师 logits）。
 
 
 
@@ -115,8 +127,8 @@ $$L_{total} = L_{pos} + \lambda_1 L_{node\_type} + \lambda_2 L_{edge\_type} + \l
 * **任务**:
 1. 固定一个离散时间步数 \(N\)（例如 10/20/50；先小后大做对照），按照 Karras 等人的公式一次性生成时间网格 \(\{t_n\}_{n=1}^N\)，在整个训练过程中 **不再动态增加或调整时间步**。
 2. 每个 iteration **随机采样** 一个时间步索引 \(n \sim \mathcal{U}\{1,\dots,N-1\}\)（或按噪声权重采样），从数据分布采样 \(x\)，并按 SDE 转移采样 \(x_{t_{n+1}}\)。
-3. 用教师模型构造相邻对：根据一步 ODE solver 得到连续部分 \(\hat{X}^\phi_{t_n}\)，并取教师在对应时间步的离散 logits 作为类型监督，形成 \((\hat{x}^\phi_{t_n}, x_{t_{n+1}})\)。
-4. 用一致性损失训练单个一致性模型 \(\mathcal{C}_\theta\)（配合 EMA \(\theta^-\)），当前阶段**仅启用基础一致性损失**（连续 + 离散），\(L_{\text{Physics}}\) 保留为后续扩展选项，避免一次性引入过多不稳定因素。
+3. 用教师模型构造相邻对：连续部分用一步 ODE solver 得到 \(\hat{X}_{t_n}\)；离散部分用后验 \(q(C_{t_n}\mid C_{t_{n+1}}, \hat{C}_0^{teacher})\) 得到 \(\hat{C}_{t_n}\)，从而形成 \((state_{t_{n+1}}, \widehat{state}_{t_n})\)。
+4. 用一致性损失训练单个一致性模型 \(\mathcal{C}_\theta\)（配合 EMA \(\theta^-\)），当前阶段**仅启用基础一致性损失**（连续 + 离散），且离散 loss 的匹配对象是 EMA 学生输出（Consistency），而不是教师 logits（KD）。\(L_{\text{Physics}}\) 保留为后续扩展选项，避免一次性引入过多不稳定因素。
 5. 将蒸馏训练全流程接入 **Weights & Biases (wandb)**：
    - 记录 loss 曲线、学习率、梯度范数等训练日志；
    - 配置统一的 `wandb.run` meta 信息（teacher ckpt、数据集、time grid 配置等），方便不同云任务对比。
@@ -128,6 +140,10 @@ $$L_{total} = L_{pos} + \lambda_1 L_{node\_type} + \lambda_2 L_{edge\_type} + \l
 * **文件**: `scripts/eval_consistency.py`
 * **任务**:
 1. 使用训练好的学生模型执行 **1步、2步、4步、8步** 采样。
+2. 明确实现 **混合状态多步采样闭环 (Mixed-State Sampling Loop)**：一致性模型每一步输出 \((\hat{X}_0,\hat{C}_0)\)，若需进行下一步去噪，必须将其“加噪回当前时间步”：
+   - **连续坐标 Renoise**：按高斯公式从 \(\hat{X}_0\) 采样/生成 \(X_{\tau_i}\)；
+   - **离散类型 Renoise**：将 \(\hat{C}_0\)（可取 argmax one-hot 或分布）通过离散转移（categorical transition）加噪得到 \(C_{\tau_i}\)；
+   - 得到新的混合状态 \((X_{\tau_i}, C_{\tau_i})\) 作为下一次模型输入，直至达到步数预算。
 2. 对比指标（形成“步数-质量-速度”对照表）：
 * **速度指标**：wall time / samples-per-second / GPU util（至少报告 wall time 与吞吐）。
 * **基础指标**：Vina Score (亲和力), QED, SA。
