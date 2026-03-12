@@ -1,5 +1,6 @@
 import argparse
 import copy
+import gc
 import os
 import subprocess
 from datetime import datetime
@@ -9,6 +10,7 @@ import torch
 import torch.nn.functional as F
 from easydict import EasyDict
 from torch.nn.utils import clip_grad_norm_
+from torch_geometric.data import Batch as GeoBatch
 from torch_geometric.loader import DataLoader
 from tqdm.auto import tqdm
 
@@ -206,6 +208,24 @@ def _build_safe_loader(train_config, distill_cfg, logger):
     return _build_train_loader(train_config, safe_cfg, logger)
 
 
+def _is_cuda_oom_error(exc: RuntimeError) -> bool:
+    return "out of memory" in str(exc).lower()
+
+
+def _reduce_batch_for_oom(batch):
+    num_graphs = int(getattr(batch, "num_graphs", len(batch)))
+    if num_graphs <= 1:
+        return None
+
+    follow_batch = [k.replace("_batch", "") for k in batch.keys() if k.endswith("_batch")]
+    device = batch["node_pos"].device
+    batch_cpu = batch.cpu()
+    data_list = batch_cpu.to_data_list()
+    new_bs = max(num_graphs // 2, 1)
+    reduced = GeoBatch.from_data_list(data_list[:new_bs], follow_batch=follow_batch).to(device)
+    return reduced
+
+
 def _save_distill_ckpt(path, step, student, ema_student, optimizer, config, transitions):
     ckpt = {
         "step": step,
@@ -386,80 +406,110 @@ def main():
                 batch = next(train_iter).to(device)
             else:
                 raise
-        node_batch = batch["node_type_batch"]
-        edge_batch = batch["halfedge_type_batch"]
-        n_graphs = batch.num_graphs
+        oom_retries = int(getattr(distill_cfg.train, "oom_retries", 8))
+        retry_idx = 0
+        skip_step = False
+        while True:
+            try:
+                node_batch = batch["node_type_batch"]
+                edge_batch = batch["halfedge_type_batch"]
+                n_graphs = batch.num_graphs
 
-        t_high_graph = torch.randint(
-            low=1,
-            high=int(distill_cfg.num_steps),
-            size=(n_graphs,),
-            device=device,
-            dtype=torch.long,
-        )
+                t_high_graph = torch.randint(
+                    low=1,
+                    high=int(distill_cfg.num_steps),
+                    size=(n_graphs,),
+                    device=device,
+                    dtype=torch.long,
+                )
 
-        node_high, log_node_high, _ = transitions["node"].add_noise(batch["node_type"], t_high_graph, batch=node_batch)
-        edge_high, log_edge_high, _ = transitions["edge"].add_noise(batch["halfedge_type"], t_high_graph, batch=edge_batch)
-        pos_high = transitions["pos"].add_noise(batch["node_pos"], t_high_graph, batch=node_batch)
+                node_high, log_node_high, _ = transitions["node"].add_noise(batch["node_type"], t_high_graph, batch=node_batch)
+                edge_high, log_edge_high, _ = transitions["edge"].add_noise(batch["halfedge_type"], t_high_graph, batch=edge_batch)
+                pos_high = transitions["pos"].add_noise(batch["node_pos"], t_high_graph, batch=node_batch)
 
-        batch["node_in"] = node_high
-        batch["halfedge_in"] = edge_high
-        batch["pos_in"] = pos_high
+                batch["node_in"] = node_high
+                batch["halfedge_in"] = edge_high
+                batch["pos_in"] = pos_high
 
-        with torch.no_grad():
-            teacher_pred = normalize_pred_x0(teacher(batch))
-            teacher_log_node_x0 = F.log_softmax(teacher_pred["pred_node_logits_x0"], dim=-1)
-            teacher_log_edge_x0 = F.log_softmax(teacher_pred["pred_halfedge_logits_x0"], dim=-1)
+                with torch.no_grad():
+                    teacher_pred = normalize_pred_x0(teacher(batch))
+                    teacher_log_node_x0 = F.log_softmax(teacher_pred["pred_node_logits_x0"], dim=-1)
+                    teacher_log_edge_x0 = F.log_softmax(teacher_pred["pred_halfedge_logits_x0"], dim=-1)
 
-            pos_low_hat = transitions["pos"].get_prev_from_recon(
-                x_t=pos_high,
-                x_recon=teacher_pred["pred_pos_x0"],
-                t=t_high_graph,
-                batch=node_batch,
-            )
-            log_node_low = transitions["node"].q_v_posterior(
-                log_v0=teacher_log_node_x0,
-                log_vt=log_node_high,
-                t=t_high_graph,
-                batch=node_batch,
-                v0_prob=True,
-            )
-            node_low_hat = log_sample_categorical(log_node_low)
-            log_edge_low = transitions["edge"].q_v_posterior(
-                log_v0=teacher_log_edge_x0,
-                log_vt=log_edge_high,
-                t=t_high_graph,
-                batch=edge_batch,
-                v0_prob=True,
-            )
-            edge_low_hat = log_sample_categorical(log_edge_low)
+                    pos_low_hat = transitions["pos"].get_prev_from_recon(
+                        x_t=pos_high,
+                        x_recon=teacher_pred["pred_pos_x0"],
+                        t=t_high_graph,
+                        batch=node_batch,
+                    )
+                    log_node_low = transitions["node"].q_v_posterior(
+                        log_v0=teacher_log_node_x0,
+                        log_vt=log_node_high,
+                        t=t_high_graph,
+                        batch=node_batch,
+                        v0_prob=True,
+                    )
+                    node_low_hat = log_sample_categorical(log_node_low)
+                    log_edge_low = transitions["edge"].q_v_posterior(
+                        log_v0=teacher_log_edge_x0,
+                        log_vt=log_edge_high,
+                        t=t_high_graph,
+                        batch=edge_batch,
+                        v0_prob=True,
+                    )
+                    edge_low_hat = log_sample_categorical(log_edge_low)
 
-            batch["node_in"] = node_low_hat
-            batch["halfedge_in"] = edge_low_hat
-            batch["pos_in"] = pos_low_hat
-            ema_pred = normalize_pred_x0(ema_student(batch))
+                    batch["node_in"] = node_low_hat
+                    batch["halfedge_in"] = edge_low_hat
+                    batch["pos_in"] = pos_low_hat
+                    ema_pred = normalize_pred_x0(ema_student(batch))
 
-        batch["node_in"] = node_high
-        batch["halfedge_in"] = edge_high
-        batch["pos_in"] = pos_high
-        student_pred = normalize_pred_x0(student(batch))
+                batch["node_in"] = node_high
+                batch["halfedge_in"] = edge_high
+                batch["pos_in"] = pos_high
+                student_pred = normalize_pred_x0(student(batch))
 
-        loss_dict = loss_fn(
-            student_pred_x0=student_pred,
-            ema_pred_x0=ema_pred,
-            mask_pos=(batch["fixed_pos"] == 0),
-            mask_node=(batch["fixed_node"] == 0),
-            mask_edge=(batch["fixed_halfedge"] == 0),
-        )
-        loss = loss_dict["total"]
+                loss_dict = loss_fn(
+                    student_pred_x0=student_pred,
+                    ema_pred_x0=ema_pred,
+                    mask_pos=(batch["fixed_pos"] == 0),
+                    mask_node=(batch["fixed_node"] == 0),
+                    mask_edge=(batch["fixed_halfedge"] == 0),
+                )
+                loss = loss_dict["total"]
 
-        optimizer.zero_grad(set_to_none=True)
-        loss.backward()
-        grad_norm = torch.tensor(0.0, device=device)
-        if grad_clip > 0:
-            grad_norm = clip_grad_norm_(student.parameters(), grad_clip)
-        optimizer.step()
-        ema_update_(ema_student, student, decay=ema_decay)
+                optimizer.zero_grad(set_to_none=True)
+                loss.backward()
+                grad_norm = torch.tensor(0.0, device=device)
+                if grad_clip > 0:
+                    grad_norm = clip_grad_norm_(student.parameters(), grad_clip)
+                optimizer.step()
+                ema_update_(ema_student, student, decay=ema_decay)
+                break
+            except RuntimeError as exc:
+                if not _is_cuda_oom_error(exc):
+                    raise
+                optimizer.zero_grad(set_to_none=True)
+                torch.cuda.empty_cache()
+                gc.collect()
+                reduced_batch = _reduce_batch_for_oom(batch)
+                if (reduced_batch is None) or (retry_idx >= oom_retries):
+                    logger.warning(
+                        "Step %d skipped after CUDA OOM (retry=%d/%d).",
+                        step, retry_idx, oom_retries,
+                    )
+                    if wandb_run is not None:
+                        wandb_run.log({"train/oom_skip": 1}, step=step)
+                    skip_step = True
+                    break
+                retry_idx += 1
+                batch = reduced_batch
+                logger.warning(
+                    "CUDA OOM at step %d, retry %d with reduced num_graphs=%d",
+                    step, retry_idx, batch.num_graphs,
+                )
+        if skip_step:
+            continue
 
         scalars = {
             "train/loss_total": float(loss_dict["total"].detach().cpu()),
