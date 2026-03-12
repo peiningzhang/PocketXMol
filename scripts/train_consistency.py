@@ -238,7 +238,38 @@ def _wandb_meta_from_run(wandb_run):
     }
 
 
-def _init_wandb_run(distill_cfg, config, logger, log_dir, resume_ckpt=None):
+def _infer_wandb_id_from_resume_path(resume_path: str, logger):
+    if not resume_path:
+        return None
+    # resume_path: <exp_dir>/checkpoints/last.pt
+    exp_dir = os.path.dirname(os.path.dirname(resume_path))
+    wandb_root = os.path.join(exp_dir, "wandb")
+    if not os.path.isdir(wandb_root):
+        return None
+    # Prefer `latest-run` symlink/file if present.
+    latest_run = os.path.join(wandb_root, "latest-run")
+    candidates = []
+    if os.path.exists(latest_run):
+        candidates.append(os.path.realpath(latest_run))
+    for name in os.listdir(wandb_root):
+        path = os.path.join(wandb_root, name)
+        if os.path.isdir(path) and name.startswith("run-"):
+            candidates.append(path)
+    if len(candidates) == 0:
+        return None
+    # Most recently modified run dir.
+    candidates = sorted(set(candidates), key=lambda p: os.path.getmtime(p), reverse=True)
+    run_dir = os.path.basename(candidates[0])
+    # Format: run-YYYYmmdd_HHMMSS-<run_id>
+    if "-" in run_dir:
+        run_id = run_dir.rsplit("-", 1)[-1]
+        if run_id:
+            logger.info("Inferred wandb run id from resume path: %s", run_id)
+            return run_id
+    return None
+
+
+def _init_wandb_run(distill_cfg, config, logger, log_dir, resume_ckpt=None, resume_path=""):
     wandb_cfg = getattr(distill_cfg, "wandb", EasyDict())
     use_wandb = bool(getattr(wandb_cfg, "enabled", False))
     if not use_wandb:
@@ -253,6 +284,8 @@ def _init_wandb_run(distill_cfg, config, logger, log_dir, resume_ckpt=None):
     run_id = getattr(wandb_cfg, "id", "")
     if (not run_id) and (resume_ckpt is not None):
         run_id = (resume_ckpt.get("wandb") or {}).get("run_id", "")
+    if not run_id:
+        run_id = _infer_wandb_id_from_resume_path(resume_path, logger)
     run_id = run_id if run_id else None
 
     init_kwargs = {
@@ -434,6 +467,7 @@ def main():
         logger=logger,
         log_dir=log_dir,
         resume_ckpt=ckpt,
+        resume_path=resume_path,
     )
 
     prog = tqdm(range(start_step, max_steps + 1), desc="Consistency Distill")
