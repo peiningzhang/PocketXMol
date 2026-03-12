@@ -115,7 +115,7 @@ def evaluate_mol_dict(mol_dict, metrics_list, metric_path):
         elif metric_name == 'validity':
             validity = calculate_validity(
                 output_dir=metric_path,
-                # is_edm=('e3_diffusion_for_molecules' in metric_path),
+                mol_dict=mol_dict,
             )
             with open(os.path.join(metric_path, 'validity.json'), 'w') as f:
                 json.dump(validity, f, indent=2)

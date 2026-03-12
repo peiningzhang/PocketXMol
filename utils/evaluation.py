@@ -339,11 +339,24 @@ def calculate_validity(output_dir, mol_dict=None):
     Calculate the validity and connectivity of the sampled molecules
     """
     samples_path = os.path.join(output_dir, 'samples_all.pt')
-    # if not os.path.exists(samples_path):
-    if True:
+    if not os.path.exists(samples_path):
         # print('samples_all.pt not found. cannot calculate validity and connectivity')
-        connectivity = sum([1 for mol in mol_dict.values() if '.' not in Chem.MolToSmiles(mol)]) / len(mol_dict)
+        if mol_dict is None or len(mol_dict) == 0:
+            return {'validity': np.nan, 'connectivity': np.nan}
+        mols = [m for m in mol_dict.values() if m is not None]
+        if not mols:
+            return {'validity': np.nan, 'connectivity': np.nan}
+        connected = 0
+        for mol in mols:
+            try:
+                smi = Chem.MolToSmiles(mol)
+                if smi and '.' not in smi:
+                    connected += 1
+            except Exception:
+                pass
+        connectivity = connected / len(mols)
         return {'validity': np.nan, 'connectivity': connectivity}
+
     pool = torch.load(samples_path)
 
     # if 'edm' in output_dir:  # for edm
