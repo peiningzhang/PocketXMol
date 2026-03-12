@@ -6,6 +6,18 @@ distill:
   student_checkpoint: ""
   resume: ""
   task_name: "sbdd"
+  # Optional: override teacher train data path for current machine.
+  # data_override:
+  #   root: "/shared/healthinfolab/phz24002/PocketXMol/data"
+  #   assembly_path: "assemblies/cls30.lmdb"   # script will use cls30_train.lmdb
+  #   # Optional: override db ratio for the selected task only
+  #   # db_ratio:
+  #   #   csd: 1.0
+  #   # Optional: provide full dataset block (advanced)
+  #   # dataset:
+  #   #   root: "/path/to/data"
+  #   #   assembly_path: "assemblies/xxx.lmdb"
+  #   #   dbs: [...]
 
   # Karras schedule (rho=7)
   num_steps: 50
