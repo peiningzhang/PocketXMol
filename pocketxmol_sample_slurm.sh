@@ -29,18 +29,8 @@ OUTDIR=${2:-/shared/healthinfolab/phz24002/PocketXMol/outputs_test/sbdd_csd_noAR
 
 set -euo pipefail
 
-# Match the interactive workflow that works on GPU nodes:
-#   conda_shared && conda activate PocketXMol
-if [ -f "$HOME/.bashrc" ]; then
-  # Make sure cluster-provided functions/modules are available in batch jobs.
-  source "$HOME/.bashrc"
-fi
-if command -v conda_shared >/dev/null 2>&1; then
-  conda_shared
-elif command -v module >/dev/null 2>&1; then
-  module load conda_shared
-fi
-conda activate PocketXMol
+CONDA_ENV_PATH="/shared/healthinfolab/phz24002/anaconda3/envs/PocketXMol"
+export PATH="$CONDA_ENV_PATH/bin:$PATH"
 export PYTHONPATH="$SCRIPT_DIR:$PYTHONPATH"
 
 mkdir -p "$SCRIPT_DIR/logs"
