@@ -58,8 +58,62 @@ def _build_in_dims(featurizers):
     return in_dims
 
 
+def _apply_data_override(train_config, distill_cfg, task_name, logger):
+    data_cfg = copy.deepcopy(train_config.data)
+    override = getattr(distill_cfg, "data_override", None)
+    if override is None:
+        return data_cfg
+
+    if isinstance(override, dict):
+        override = EasyDict(override)
+
+    if "dataset" in override:
+        for key, value in override.dataset.items():
+            data_cfg.dataset[key] = value
+    else:
+        if "root" in override:
+            data_cfg.dataset.root = override.root
+        if "assembly_path" in override:
+            data_cfg.dataset.assembly_path = override.assembly_path
+        if "dbs" in override:
+            data_cfg.dataset.dbs = override.dbs
+
+    if "task_db_weights" in override:
+        data_cfg.task_db_weights = override.task_db_weights
+    elif "db_ratio" in override:
+        if task_name not in data_cfg.task_db_weights:
+            raise KeyError(f"task_name={task_name} not found in task_db_weights.")
+        data_cfg.task_db_weights[task_name].db_ratio = override.db_ratio
+
+    logger.info(
+        "Applied data_override: root=%s assembly=%s",
+        data_cfg.dataset.root,
+        data_cfg.dataset.assembly_path,
+    )
+    return data_cfg
+
+
+def _check_assembly_exists(dataset_cfg, mode="train"):
+    root = dataset_cfg.root
+    assembly = dataset_cfg.assembly_path
+    base = os.path.join(root, assembly)
+    if base.endswith(".lmdb"):
+        # ForeverTaskDataset appends _train/_val/_test automatically.
+        expect = base.replace(".lmdb", f"_{mode}.lmdb")
+    else:
+        expect = base
+    if not os.path.exists(expect):
+        raise FileNotFoundError(
+            f"Assembly file not found: {expect}. "
+            "Please set distill.data_override.root / assembly_path in config."
+        )
+
+
 def _build_train_loader(train_config, distill_cfg, logger):
     task_name = distill_cfg.task_name
+    data_cfg = _apply_data_override(train_config, distill_cfg, task_name, logger)
+    _check_assembly_exists(data_cfg.dataset, mode="train")
+
     featurizers = _build_featurizers(train_config)
     in_dims = _build_in_dims(featurizers)
     task_cfg = getattr(distill_cfg, "task_transform", None)
@@ -77,13 +131,13 @@ def _build_train_loader(train_config, distill_cfg, logger):
     follow_batch = sum([getattr(t, "follow_batch", []) for t in transforms.transforms], [])
     exclude_keys = sum([getattr(t, "exclude_keys", []) for t in transforms.transforms], [])
 
-    if task_name not in train_config.data.task_db_weights:
+    if task_name not in data_cfg.task_db_weights:
         raise KeyError(f"task_name={task_name} not found in train config task_db_weights.")
-    task_db_weights = {task_name: copy.deepcopy(train_config.data.task_db_weights[task_name])}
+    task_db_weights = {task_name: copy.deepcopy(data_cfg.task_db_weights[task_name])}
 
     num_workers = int(getattr(distill_cfg.train, "num_workers", 2))
     dataset = ForeverTaskDataset(
-        train_config.data.dataset,
+        data_cfg.dataset,
         task_db_weights,
         mode="train",
         transforms=transforms,
