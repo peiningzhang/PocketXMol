@@ -44,9 +44,10 @@ distill:
   train:
     seed: 2026
     batch_size: 8
-    num_workers: 2
-    pin_memory: true
-    persistent_workers: true
+    # Safe defaults for many shared servers; increase only if /dev/shm is sufficient.
+    num_workers: 0
+    pin_memory: false
+    persistent_workers: false
     max_steps: 50000
     grad_clip: 1.0
     log_interval: 50

@@ -187,27 +187,32 @@ class GeneralCategoricalTransition(nn.Module):
         self.num_classes = num_classes
         if init_prob is None:
             self.init_prob = np.ones(num_classes) / num_classes
-        elif init_prob == 'absorb':  # absorb all states into the first one
-            init_prob = 0.01 * np.ones(num_classes)
-            init_prob[0] = 1
-            self.init_prob = init_prob / np.sum(init_prob)
-        elif init_prob == 'absorb_pure':  # absorb all states into the first one
-            init_prob = np.zeros(num_classes)
-            init_prob[0] = 1
-            self.init_prob = init_prob / np.sum(init_prob)
-        elif init_prob == 'tomask':  # absorb all states into the the mask type (last one)
-            init_prob = 1e-6 * np.ones(num_classes)
-            init_prob[-1] = 1.
-            self.init_prob = init_prob / np.sum(init_prob)
-        elif init_prob == 'tomask0.5':
-            init_prob = np.ones(num_classes)
-            init_prob[-1] = 0.5
-            init_prob[:-1] = 0.5 / (num_classes - 1)
-            self.init_prob = init_prob / np.sum(init_prob)
-        elif init_prob == 'uniform':
-            self.init_prob = np.ones(num_classes) / num_classes
         else:
-            self.init_prob = init_prob / np.sum(init_prob)
+            if isinstance(init_prob, str):
+                if init_prob == 'absorb':  # absorb all states into the first one
+                    init_prob = 0.01 * np.ones(num_classes)
+                    init_prob[0] = 1
+                    self.init_prob = init_prob / np.sum(init_prob)
+                elif init_prob == 'absorb_pure':  # absorb all states into the first one
+                    init_prob = np.zeros(num_classes)
+                    init_prob[0] = 1
+                    self.init_prob = init_prob / np.sum(init_prob)
+                elif init_prob == 'tomask':  # absorb all states into the the mask type (last one)
+                    init_prob = 1e-6 * np.ones(num_classes)
+                    init_prob[-1] = 1.
+                    self.init_prob = init_prob / np.sum(init_prob)
+                elif init_prob == 'tomask0.5':
+                    init_prob = np.ones(num_classes)
+                    init_prob[-1] = 0.5
+                    init_prob[:-1] = 0.5 / (num_classes - 1)
+                    self.init_prob = init_prob / np.sum(init_prob)
+                elif init_prob == 'uniform':
+                    self.init_prob = np.ones(num_classes) / num_classes
+                else:
+                    raise ValueError(f'Unknown init_prob mode: {init_prob}')
+            else:
+                init_prob = np.asarray(init_prob, dtype=np.float64)
+                self.init_prob = init_prob / np.sum(init_prob)
         self.betas = (betas)
         self.num_timesteps = len(betas)
         

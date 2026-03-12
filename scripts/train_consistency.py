@@ -175,6 +175,28 @@ def _build_train_loader(train_config, distill_cfg, logger):
     return loader, in_dims
 
 
+def _is_dataloader_shm_error(exc: RuntimeError) -> bool:
+    msg = str(exc)
+    patterns = [
+        "unable to mmap",
+        "Cannot allocate memory",
+        "Pin memory thread exited unexpectedly",
+        "DataLoader worker",
+    ]
+    return any(p in msg for p in patterns)
+
+
+def _build_safe_loader(train_config, distill_cfg, logger):
+    safe_cfg = copy.deepcopy(distill_cfg)
+    safe_cfg.train.num_workers = 0
+    safe_cfg.train.pin_memory = False
+    safe_cfg.train.persistent_workers = False
+    logger.warning(
+        "Switching to safe DataLoader: num_workers=0, pin_memory=False, persistent_workers=False"
+    )
+    return _build_train_loader(train_config, safe_cfg, logger)
+
+
 def _save_distill_ckpt(path, step, student, ema_student, optimizer, config, transitions):
     ckpt = {
         "step": step,
@@ -266,6 +288,7 @@ def main():
     logger.info("Teacher train config: %s", teacher_train_cfg_path)
 
     train_loader, in_dims = _build_train_loader(teacher_train_cfg, distill_cfg, logger)
+    loader_is_safe = False
     train_iter = cycle(train_loader)
 
     device = torch.device(args.device)
@@ -343,7 +366,17 @@ def main():
     prog = tqdm(range(start_step, max_steps + 1), desc="Consistency Distill")
     for step in prog:
         student.train()
-        batch = next(train_iter).to(device)
+        try:
+            batch = next(train_iter).to(device)
+        except RuntimeError as exc:
+            if _is_dataloader_shm_error(exc) and (not loader_is_safe):
+                logger.warning("DataLoader shared-memory error detected: %s", exc)
+                train_loader, _ = _build_safe_loader(teacher_train_cfg, distill_cfg, logger)
+                train_iter = cycle(train_loader)
+                loader_is_safe = True
+                batch = next(train_iter).to(device)
+            else:
+                raise
         node_batch = batch["node_type_batch"]
         edge_batch = batch["halfedge_type_batch"]
         n_graphs = batch.num_graphs
