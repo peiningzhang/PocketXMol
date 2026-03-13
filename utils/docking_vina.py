@@ -6,7 +6,10 @@ Adapted from TargetDiff.
 
 from openbabel import pybel
 from meeko import MoleculePreparation
-from meeko import obutils
+try:
+    from meeko import obutils
+except Exception:
+    obutils = None
 from vina import Vina
 import subprocess
 import rdkit.Chem as Chem
@@ -17,6 +20,16 @@ import os
 import contextlib
 
 from utils.docking_qvina import get_random_id, BaseDockingTask
+
+
+def _maybe_write_molecule(ob_mol, out_path):
+    # Optional debug dump; meeko API differs across versions.
+    if obutils is None:
+        return
+    try:
+        obutils.writeMolecule(ob_mol, out_path)
+    except Exception:
+        return
 
 
 def supress_stdout(func):
@@ -55,14 +68,14 @@ class PrepLig(object):
         
     def addH(self, polaronly=False, correctforph=True, PH=7): 
         self.ob_mol.OBMol.AddHydrogens(polaronly, correctforph, PH)
-        obutils.writeMolecule(self.ob_mol.OBMol, 'tmp_h.sdf')
+        _maybe_write_molecule(self.ob_mol.OBMol, 'tmp_h.sdf')
 
     def gen_conf(self):
         sdf_block = self.ob_mol.write('sdf')
         rdkit_mol = Chem.MolFromMolBlock(sdf_block, removeHs=False)
         AllChem.EmbedMolecule(rdkit_mol, Chem.rdDistGeom.ETKDGv3())
         self.ob_mol = pybel.readstring('sdf', Chem.MolToMolBlock(rdkit_mol))
-        obutils.writeMolecule(self.ob_mol.OBMol, 'conf_h.sdf')
+        _maybe_write_molecule(self.ob_mol.OBMol, 'conf_h.sdf')
 
     @supress_stdout
     def get_pdbqt(self, lig_pdbqt=None):
