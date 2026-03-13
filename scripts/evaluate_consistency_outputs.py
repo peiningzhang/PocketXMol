@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import traceback
 from multiprocessing import Pool
 
 import numpy as np
@@ -77,20 +78,27 @@ def _collect_metric_summary(step_dir):
     return out
 
 
-def _add_ref_protein_dict(mols_dict, gen_path):
+def _add_ref_protein_dict(mols_dict, gen_path, skip_failed_tags=True):
     df_gen = pd.read_csv(os.path.join(gen_path, "gen_info.csv"))
-    filename2data_id = df_gen[["filename", "data_id"]].copy()
-    filename2data_id = filename2data_id.set_index("filename").to_dict()["data_id"]
+    if "tag" not in df_gen.columns:
+        df_gen["tag"] = ""
+    filename2meta = df_gen[["filename", "data_id", "tag"]].copy().set_index("filename")
 
     dock_inputs_list = []
     for gen_name, mol in mols_dict.items():
-        data_id = filename2data_id[gen_name]
+        if gen_name not in filename2meta.index:
+            continue
+        data_id = filename2meta.at[gen_name, "data_id"]
+        tag = str(filename2meta.at[gen_name, "tag"])
+        if skip_failed_tags and tag in {"bad", "incomp"}:
+            continue
         protein_fn = data_id + "_pro.pdb"
         dock_inputs_list.append(
             {
                 "filename": gen_name,
                 "mol": mol,
                 "protein_fn": protein_fn,
+                "tag": tag,
             }
         )
     return dock_inputs_list
@@ -98,11 +106,15 @@ def _add_ref_protein_dict(mols_dict, gen_path):
 
 def _dock_single(inputs):
     filename, mol, protein_fn, protein_root, exhaustiveness = inputs
+    error_msg = ""
     try:
         if mol is None:
             raise ValueError(f"{filename} is None")
         if mol.HasSubstructMatch(Chem.MolFromSmarts("[#5]")):
             raise ValueError(f"{filename} contains element B")
+        protein_path = os.path.join(protein_root, protein_fn)
+        if not os.path.exists(protein_path):
+            raise FileNotFoundError(f"Protein not found: {protein_path}")
 
         vina_task = VinaDockingTask.from_generated_mol(mol, protein_fn, protein_root=protein_root)
         score_only = vina_task.run(mode="score_only", exhaustiveness=exhaustiveness)[0]
@@ -116,6 +128,7 @@ def _dock_single(inputs):
             "vina_pose_dock": dock["pose"],
         }
     except Exception:
+        error_msg = traceback.format_exc(limit=1).strip().replace("\n", " | ")
         vina_scores = {
             "vina_score": np.nan,
             "vina_min": np.nan,
@@ -123,7 +136,7 @@ def _dock_single(inputs):
             "vina_dock": np.nan,
             "vina_pose_dock": "",
         }
-    return {"filename": filename, **vina_scores}
+    return {"filename": filename, **vina_scores, "error": error_msg}
 
 
 def _calc_vina(inputs_list, gen_path, protein_root, exhaustiveness, n_workers):
@@ -166,6 +179,8 @@ def main():
 
         if args.eval_vina:
             dock_inputs = _add_ref_protein_dict(mols_dict, step_dir)
+            if len(dock_inputs) == 0:
+                logger.warning("No eligible molecules for Vina (likely all tagged bad/incomp).")
             df_vina = _calc_vina(
                 dock_inputs,
                 step_dir,
@@ -173,6 +188,11 @@ def main():
                 exhaustiveness=args.exhaustiveness,
                 n_workers=args.vina_workers,
             )
+            row["vina_attempted"] = int(len(df_vina))
+            if "vina_score" in df_vina.columns:
+                success = int(df_vina["vina_score"].notna().sum())
+                row["vina_success"] = success
+                row["vina_success_rate"] = float(success / max(len(df_vina), 1))
             if "vina_score" in df_vina.columns:
                 row["vina_score_mean"] = float(df_vina["vina_score"].mean())
             if "vina_min" in df_vina.columns:
