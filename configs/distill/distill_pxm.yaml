@@ -9,6 +9,8 @@ distill:
   data_override:
     root: "./data_train"
     assembly_path: "assemblies/split_reduced_assembly.lmdb"
+    db_ratio:
+      csd: 1.0
   # Optional: override teacher train data path for current machine.
   # data_override:
   #   root: "/shared/healthinfolab/phz24002/PocketXMol/data"
@@ -62,7 +64,7 @@ distill:
     project: "pocketxmol-consistency"
     name: "sbdd-distill-run1"
     entity: ""
-    id: ""          # optional fixed run id
+    id: "wu8mmmbb"          # optional fixed run id
     resume: "allow" # allow | must | never
 
 
