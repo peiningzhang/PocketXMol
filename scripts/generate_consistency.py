@@ -190,6 +190,7 @@ def main():
     parser.add_argument("--config_model", type=str, default="configs/sample/pxm.yml")
     parser.add_argument("--sample_steps", type=int, nargs="+", default=[1, 2, 4, 8])
     parser.add_argument("--num_mols", type=int, default=1000)
+    parser.add_argument("--num_repeats", type=int, default=0, help="0 means auto from config/sample or unlimited until num_mols reached")
     parser.add_argument("--batch_size", type=int, default=0)
     parser.add_argument("--num_workers", type=int, default=1)
     parser.add_argument("--device", type=str, default="cuda:0")
@@ -215,6 +216,12 @@ def main():
     task_cfg = make_config(args.config_task, args.config_model)
     batch_size = args.batch_size if args.batch_size > 0 else int(getattr(task_cfg.sample, "batch_size", 32))
     loader, featurizer, in_dims = _build_test_loader(teacher_train_cfg, task_cfg, batch_size, args.num_workers)
+    configured_repeats = int(getattr(task_cfg.sample, "num_repeats", 1))
+    if args.num_repeats > 0:
+        max_repeats = args.num_repeats
+    else:
+        # If config has num_repeats, honor it; otherwise keep generating until num_mols.
+        max_repeats = configured_repeats if configured_repeats > 0 else int(1e9)
 
     device = torch.device(args.device)
     model = PMAsymDenoiser(config=teacher_train_cfg.model, **in_dims).to(device)
@@ -250,20 +257,25 @@ def main():
         i_saved = 0
         all_rows = []
         time_start = time.time()
-        for batch in tqdm(loader, desc=f"Sampling {sample_steps}-step"):
-            if i_saved >= args.num_mols:
-                break
-            batch = batch.to(device)
-            batch, outputs = _consistency_sample_batch(
-                batch=batch,
-                model=model,
-                transitions=transitions,
-                total_steps=int(distill_cfg.num_steps),
-                sample_steps=int(sample_steps),
-                sigma_max=float(distill_cfg.karras.sigma_max),
-            )
-            rows, i_saved = _post_process_batch(batch, outputs, featurizer, sdf_dir, i_saved)
-            all_rows.extend(rows)
+        i_repeat = 0
+        while i_saved < args.num_mols and i_repeat < max_repeats:
+            for batch in tqdm(loader, desc=f"Sampling {sample_steps}-step (repeat {i_repeat})"):
+                if i_saved >= args.num_mols:
+                    break
+                batch = batch.to(device)
+                batch, outputs = _consistency_sample_batch(
+                    batch=batch,
+                    model=model,
+                    transitions=transitions,
+                    total_steps=int(distill_cfg.num_steps),
+                    sample_steps=int(sample_steps),
+                    sigma_max=float(distill_cfg.karras.sigma_max),
+                )
+                rows, i_saved = _post_process_batch(batch, outputs, featurizer, sdf_dir, i_saved)
+                for row in rows:
+                    row["i_repeat"] = i_repeat
+                all_rows.extend(rows)
+            i_repeat += 1
         wall_time = time.time() - time_start
 
         df_info = pd.DataFrame(all_rows)
@@ -271,12 +283,18 @@ def main():
         meta = {
             "sample_steps": int(sample_steps),
             "num_samples": int(len(df_info)),
+            "num_repeats_run": int(i_repeat),
             "wall_time_sec": float(wall_time),
             "samples_per_sec": float(len(df_info) / max(wall_time, 1e-8)),
         }
         with open(os.path.join(step_dir, "generation_meta.json"), "w") as f:
             json.dump(meta, f, indent=2)
         summary_rows.append(meta)
+        if i_saved < args.num_mols:
+            logger.warning(
+                "Requested num_mols=%d but only generated %d after %d repeats.",
+                args.num_mols, i_saved, i_repeat
+            )
         logger.info("Saved %d molecules to %s", len(df_info), step_dir)
 
     df_summary = pd.DataFrame(summary_rows).sort_values("sample_steps")
