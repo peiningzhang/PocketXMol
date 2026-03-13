@@ -15,11 +15,15 @@ import subprocess
 import rdkit.Chem as Chem
 from rdkit.Chem import AllChem
 import tempfile
-import AutoDockTools
 import os
 import contextlib
 
 from utils.docking_qvina import get_random_id, BaseDockingTask
+
+try:
+    import AutoDockTools
+except Exception:
+    AutoDockTools = None
 
 
 def _maybe_write_molecule(ob_mol, out_path):
@@ -107,9 +111,23 @@ class PrepProt(object):
                          stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL).communicate()
 
     def get_pdbqt(self, prot_pdbqt):
-        prepare_receptor = os.path.join(AutoDockTools.__path__[0], 'Utilities24/prepare_receptor4.py')
-        subprocess.Popen(['python3', prepare_receptor, '-r', self.prot_pqr, '-o', prot_pdbqt],
-                         stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL).communicate()
+        if AutoDockTools is not None:
+            prepare_receptor = os.path.join(AutoDockTools.__path__[0], 'Utilities24/prepare_receptor4.py')
+            subprocess.Popen(
+                ['python3', prepare_receptor, '-r', self.prot_pqr, '-o', prot_pdbqt],
+                stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL
+            ).communicate()
+            return
+
+        # Fallback for environments without MGLTools/AutoDockTools.
+        # OpenBabel can directly write receptor pdbqt for Vina.
+        input_path = self.prot_pqr if hasattr(self, 'prot_pqr') and os.path.exists(self.prot_pqr) else self.prot
+        input_fmt = 'pqr' if input_path.lower().endswith('.pqr') else 'pdb'
+        try:
+            prot_mol = next(pybel.readfile(input_fmt, input_path))
+        except StopIteration as exc:
+            raise RuntimeError(f'Failed to read receptor file for pdbqt conversion: {input_path}') from exc
+        prot_mol.write('pdbqt', prot_pdbqt, overwrite=True)
 
 
 class VinaDock(object): 
