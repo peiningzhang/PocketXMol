@@ -39,6 +39,34 @@ def _maybe_write_molecule(ob_mol, out_path):
         return
 
 
+def _is_receptor_pdbqt_invalid(pdbqt_path):
+    if (not os.path.exists(pdbqt_path)) or (os.path.getsize(pdbqt_path) == 0):
+        return True
+    try:
+        with open(pdbqt_path, "r") as f:
+            lines = f.readlines()
+    except Exception:
+        return True
+    has_atom = any(l.startswith("ATOM") or l.startswith("HETATM") for l in lines)
+    has_ligand_tree = any(
+        l.startswith("ROOT") or l.startswith("ENDROOT") or l.startswith("BRANCH")
+        or l.startswith("ENDBRANCH") or l.startswith("TORSDOF")
+        for l in lines
+    )
+    return (not has_atom) or has_ligand_tree
+
+
+def _sanitize_receptor_pdbqt(pdbqt_path):
+    drop_prefix = ("ROOT", "ENDROOT", "BRANCH", "ENDBRANCH", "TORSDOF")
+    with open(pdbqt_path, "r") as f:
+        lines = f.readlines()
+    keep = [l for l in lines if not l.startswith(drop_prefix)]
+    if len(keep) == 0:
+        raise RuntimeError(f"Empty receptor pdbqt after sanitize: {pdbqt_path}")
+    with open(pdbqt_path, "w") as f:
+        f.writelines(keep)
+
+
 def supress_stdout(func):
     def wrapper(*a, **ka):
         with open(os.devnull, 'w') as devnull:
@@ -147,14 +175,16 @@ class PrepProt(object):
             return
 
         # Fallback for environments without MGLTools/AutoDockTools.
-        # OpenBabel can directly write receptor pdbqt for Vina.
+        # OpenBabel write + sanitize ligand-style torsion tags.
         input_path = self.prot_pqr if hasattr(self, 'prot_pqr') and os.path.exists(self.prot_pqr) else self.prot
         input_fmt = 'pqr' if input_path.lower().endswith('.pqr') else 'pdb'
         try:
             prot_mol = next(pybel.readfile(input_fmt, input_path))
         except StopIteration as exc:
             raise RuntimeError(f'Failed to read receptor file for pdbqt conversion: {input_path}') from exc
-        prot_mol.write('pdbqt', prot_pdbqt, overwrite=True)
+        # Option "r" asks for rigid output (if supported by backend).
+        prot_mol.write('pdbqt', prot_pdbqt, overwrite=True, opt={'r': None})
+        _sanitize_receptor_pdbqt(prot_pdbqt)
 
 
 class VinaDock(object): 
@@ -324,7 +354,7 @@ class VinaDockingTask(BaseDockingTask):
         prot = PrepProt(self.receptor_path)
         if not os.path.exists(protein_pqr):
             prot.addH(protein_pqr)
-        if not os.path.exists(protein_pdbqt):
+        if _is_receptor_pdbqt_invalid(protein_pdbqt):
             prot.addH(protein_pqr)
             prot.get_pdbqt(protein_pdbqt)
 
