@@ -117,15 +117,17 @@ def _dock_single(inputs):
             raise FileNotFoundError(f"Protein not found: {protein_path}")
 
         vina_task = VinaDockingTask.from_generated_mol(mol, protein_fn, protein_root=protein_root)
-        score_only = vina_task.run(mode="score_only", exhaustiveness=exhaustiveness)[0]
-        minimize = vina_task.run(mode="minimize", exhaustiveness=exhaustiveness)[0]
-        dock = vina_task.run(mode="dock", exhaustiveness=exhaustiveness)[0]
+        # Only affinity is needed for summary; skip pose conversion (pdbqt->sdf)
+        # to avoid RDKit valence failures from imperfect docked poses.
+        score_only = vina_task.run(mode="score_only", exhaustiveness=exhaustiveness, save_pose=False)[0]
+        minimize = vina_task.run(mode="minimize", exhaustiveness=exhaustiveness, save_pose=False)[0]
+        dock = vina_task.run(mode="dock", exhaustiveness=exhaustiveness, save_pose=False)[0]
         vina_scores = {
             "vina_score": score_only["affinity"],
             "vina_min": minimize["affinity"],
-            "vina_pose_min": minimize["pose"],
+            "vina_pose_min": "",
             "vina_dock": dock["affinity"],
-            "vina_pose_dock": dock["pose"],
+            "vina_pose_dock": "",
         }
     except Exception:
         error_msg = traceback.format_exc(limit=1).strip().replace("\n", " | ")
