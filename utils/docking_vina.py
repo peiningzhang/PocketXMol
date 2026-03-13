@@ -5,7 +5,10 @@ Adapted from TargetDiff.
 """
 
 from openbabel import pybel
-from meeko import MoleculePreparation
+try:
+    from meeko import MoleculePreparation
+except Exception:
+    MoleculePreparation = None
 try:
     from meeko import obutils
 except Exception:
@@ -83,13 +86,37 @@ class PrepLig(object):
 
     @supress_stdout
     def get_pdbqt(self, lig_pdbqt=None):
-        preparator = MoleculePreparation()
-        preparator.prepare(self.ob_mol.OBMol)
-        if lig_pdbqt is not None: 
-            preparator.write_pdbqt_file(lig_pdbqt)
-            return 
-        else: 
-            return preparator.write_pdbqt_string()
+        # Prefer Meeko when available, but handle API/type differences across versions.
+        if MoleculePreparation is not None:
+            try:
+                preparator = MoleculePreparation()
+                try:
+                    preparator.prepare(self.ob_mol.OBMol)
+                except TypeError:
+                    # Newer meeko may expect RDKit Mol instead of OpenBabel OBMol.
+                    sdf_block = self.ob_mol.write('sdf')
+                    rdkit_mol = Chem.MolFromMolBlock(sdf_block, removeHs=False)
+                    if rdkit_mol is None:
+                        raise
+                    preparator.prepare(rdkit_mol)
+
+                if lig_pdbqt is not None:
+                    if hasattr(preparator, "write_pdbqt_file"):
+                        preparator.write_pdbqt_file(lig_pdbqt)
+                    else:
+                        with open(lig_pdbqt, "w") as f:
+                            f.write(preparator.write_pdbqt_string())
+                    return
+                return preparator.write_pdbqt_string()
+            except Exception:
+                # Fallback to OpenBabel below.
+                pass
+
+        # OpenBabel fallback for environments without compatible meeko.
+        if lig_pdbqt is not None:
+            self.ob_mol.write('pdbqt', lig_pdbqt, overwrite=True)
+            return
+        return self.ob_mol.write('pdbqt')
         
 
 class PrepProt(object): 
