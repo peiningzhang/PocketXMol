@@ -105,7 +105,7 @@ def _add_ref_protein_dict(mols_dict, gen_path, skip_failed_tags=True):
 
 
 def _dock_single(inputs):
-    filename, mol, protein_fn, protein_root, exhaustiveness = inputs
+    filename, mol, protein_fn, protein_root, exhaustiveness, vina_modes = inputs
     error_msg = ""
     try:
         if mol is None:
@@ -117,18 +117,24 @@ def _dock_single(inputs):
             raise FileNotFoundError(f"Protein not found: {protein_path}")
 
         vina_task = VinaDockingTask.from_generated_mol(mol, protein_fn, protein_root=protein_root)
-        # Only affinity is needed for summary; skip pose conversion (pdbqt->sdf)
-        # to avoid RDKit valence failures from imperfect docked poses.
-        score_only = vina_task.run(mode="score_only", exhaustiveness=exhaustiveness, save_pose=False)[0]
-        minimize = vina_task.run(mode="minimize", exhaustiveness=exhaustiveness, save_pose=False)[0]
-        dock = vina_task.run(mode="dock", exhaustiveness=exhaustiveness, save_pose=False)[0]
         vina_scores = {
-            "vina_score": score_only["affinity"],
-            "vina_min": minimize["affinity"],
+            "vina_score": np.nan,
+            "vina_min": np.nan,
             "vina_pose_min": "",
-            "vina_dock": dock["affinity"],
+            "vina_dock": np.nan,
             "vina_pose_dock": "",
         }
+        # Only affinity is needed for summary; skip pose conversion (pdbqt->sdf)
+        # to avoid RDKit valence failures from imperfect docked poses.
+        if "score_only" in vina_modes:
+            score_only = vina_task.run(mode="score_only", exhaustiveness=exhaustiveness, save_pose=False)[0]
+            vina_scores["vina_score"] = score_only["affinity"]
+        if "minimize" in vina_modes:
+            minimize = vina_task.run(mode="minimize", exhaustiveness=exhaustiveness, save_pose=False)[0]
+            vina_scores["vina_min"] = minimize["affinity"]
+        if "dock" in vina_modes:
+            dock = vina_task.run(mode="dock", exhaustiveness=exhaustiveness, save_pose=False)[0]
+            vina_scores["vina_dock"] = dock["affinity"]
     except Exception:
         error_msg = traceback.format_exc(limit=1).strip().replace("\n", " | ")
         vina_scores = {
@@ -141,9 +147,9 @@ def _dock_single(inputs):
     return {"filename": filename, **vina_scores, "error": error_msg}
 
 
-def _calc_vina(inputs_list, gen_path, protein_root, exhaustiveness, n_workers):
+def _calc_vina(inputs_list, gen_path, protein_root, exhaustiveness, n_workers, vina_modes):
     tuples = [
-        (x["filename"], x["mol"], x["protein_fn"], protein_root, exhaustiveness)
+        (x["filename"], x["mol"], x["protein_fn"], protein_root, exhaustiveness, vina_modes)
         for x in inputs_list
     ]
     with Pool(n_workers) as p:
@@ -162,6 +168,14 @@ def main():
     parser.add_argument("--protein_root", type=str, default="data/csd/files/proteins")
     parser.add_argument("--exhaustiveness", type=int, default=16)
     parser.add_argument("--vina_workers", type=int, default=16)
+    parser.add_argument(
+        "--vina_modes",
+        type=str,
+        nargs="+",
+        default=["score_only"],
+        choices=["score_only", "minimize", "dock"],
+        help="Which vina modes to run. Default score_only for speed.",
+    )
     args = parser.parse_args()
 
     logger = get_logger("consistency_eval_post", args.gen_root)
@@ -189,10 +203,15 @@ def main():
                 protein_root=args.protein_root,
                 exhaustiveness=args.exhaustiveness,
                 n_workers=args.vina_workers,
+                vina_modes=tuple(args.vina_modes),
             )
             row["vina_attempted"] = int(len(df_vina))
-            if "vina_score" in df_vina.columns:
-                success = int(df_vina["vina_score"].notna().sum())
+            primary_col = (
+                "vina_score" if "score_only" in args.vina_modes else
+                ("vina_min" if "minimize" in args.vina_modes else "vina_dock")
+            )
+            if primary_col in df_vina.columns:
+                success = int(df_vina[primary_col].notna().sum())
                 row["vina_success"] = success
                 row["vina_success_rate"] = float(success / max(len(df_vina), 1))
             if "vina_score" in df_vina.columns:
