@@ -222,8 +222,22 @@ def main():
         summary_rows.append(row)
         logger.info("Summary@%d-step: %s", sample_steps, row)
 
-    df_summary = pd.DataFrame(summary_rows).sort_values("sample_steps")
+    df_summary_new = pd.DataFrame(summary_rows)
     out_path = os.path.join(args.gen_root, "summary.csv")
+    if os.path.exists(out_path):
+        try:
+            df_summary_old = pd.read_csv(out_path)
+            if "sample_steps" in df_summary_old.columns:
+                df_summary = pd.concat([df_summary_old, df_summary_new], ignore_index=True)
+                # Keep latest row for each step (new rows appended at end).
+                df_summary = df_summary.drop_duplicates(subset=["sample_steps"], keep="last")
+            else:
+                df_summary = df_summary_new
+        except Exception:
+            df_summary = df_summary_new
+    else:
+        df_summary = df_summary_new
+    df_summary = df_summary.sort_values("sample_steps")
     df_summary.to_csv(out_path, index=False)
     logger.info("Saved summary to %s", out_path)
 
