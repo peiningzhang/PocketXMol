@@ -8,7 +8,7 @@ distill:
   task_name: "sbdd"
   data_override:
     root: "./data_train"
-    assembly_path: "assemblies/split_reduced_assembly.lmdb"
+    assembly_path: "assemblies/split_csd.lmdb" # assembly_path: "assemblies/split_reduced_assembly.lmdb"
     db_ratio:
       csd: 1.0
   # Optional: override teacher train data path for current machine.
@@ -64,7 +64,7 @@ distill:
     project: "pocketxmol-consistency"
     name: "sbdd-distill-run1"
     entity: ""
-    id: "wu8mmmbb"          # optional fixed run id
+    id: "p3pyptv4"          # optional fixed run id
     resume: "allow" # allow | must | never
 
 
