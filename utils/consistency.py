@@ -1,4 +1,5 @@
 import copy
+import math
 import os
 from typing import Dict, Iterable, List, Optional, Tuple
 
@@ -75,6 +76,21 @@ def karras_sigmas(
     return sigmas_desc
 
 
+def log_uniform_sigmas(
+    num_steps: int,
+    sigma_min: float,
+    sigma_max: float,
+    device: Optional[torch.device] = None,
+    ascending: bool = True,
+) -> torch.Tensor:
+    sigmas_desc = torch.exp(
+        torch.linspace(math.log(sigma_max), math.log(sigma_min), num_steps, device=device)
+    )
+    if ascending:
+        return torch.flip(sigmas_desc, dims=[0])
+    return sigmas_desc
+
+
 def sigmas_to_betas(sigmas_ascending: torch.Tensor) -> torch.Tensor:
     # alpha_bar = 1 / (1 + sigma^2), with t=0 close to clean and t=T-1 noisy.
     alpha_bar = 1.0 / (1.0 + sigmas_ascending ** 2)
@@ -95,8 +111,12 @@ def build_transitions(
     node_prior_cfg=None,
     edge_prior_cfg=None,
     device: Optional[torch.device] = None,
+    schedule_type: str = "karras",
 ) -> Dict[str, object]:
-    sigmas = karras_sigmas(num_steps, sigma_min, sigma_max, rho=rho, device=device, ascending=True)
+    if schedule_type == "log_uniform":
+        sigmas = log_uniform_sigmas(num_steps, sigma_min, sigma_max, device=device, ascending=True)
+    else:
+        sigmas = karras_sigmas(num_steps, sigma_min, sigma_max, rho=rho, device=device, ascending=True)
     betas = sigmas_to_betas(sigmas).detach().cpu().numpy()
     node_init_prob = _prior_probs_from_cfg(node_prior_cfg, num_node_types)
     edge_init_prob = _prior_probs_from_cfg(edge_prior_cfg, num_edge_types)

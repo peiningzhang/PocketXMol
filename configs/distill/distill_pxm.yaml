@@ -24,8 +24,9 @@ distill:
   #   #   assembly_path: "assemblies/xxx.lmdb"
   #   #   dbs: [...]
 
-  # Karras schedule (rho=7)
+  # Karras schedule (rho=7) or log_uniform
   num_steps: 50
+  schedule: "log_uniform"  # "karras" or "log_uniform"
   karras:
     sigma_min: 0.002
     sigma_max: 80.0
@@ -50,7 +51,7 @@ distill:
     seed: 2026
     batch_size: 8
     # Safe defaults for many shared servers; increase only if /dev/shm is sufficient.
-    num_workers: 0
+    num_workers: 4
     pin_memory: false
     persistent_workers: false
     max_steps: 50000

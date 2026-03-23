@@ -412,6 +412,7 @@ def main():
         p.requires_grad_(False)
 
     task_noise_cfg = get_task_noise_cfg(teacher_train_cfg.noise, distill_cfg.task_name)
+    schedule_type = getattr(distill_cfg, "schedule", "karras")
     transitions = build_transitions(
         num_steps=int(distill_cfg.num_steps),
         sigma_min=float(distill_cfg.karras.sigma_min),
@@ -422,8 +423,9 @@ def main():
         node_prior_cfg=getattr(task_noise_cfg.prior, "node", None),
         edge_prior_cfg=getattr(task_noise_cfg.prior, "edge", None),
         device=device,
+        schedule_type=schedule_type,
     )
-    logger.info("Built Karras grid with %d steps", int(distill_cfg.num_steps))
+    logger.info("Built %s grid with %d steps", schedule_type.capitalize(), int(distill_cfg.num_steps))
 
     optimizer = torch.optim.AdamW(
         student.parameters(),
