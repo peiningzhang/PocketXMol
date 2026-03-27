@@ -475,17 +475,26 @@ def main():
     prog = tqdm(range(start_step, max_steps + 1), desc="Consistency Distill")
     for step in prog:
         student.train()
-        try:
-            batch = next(train_iter).to(device)
-        except RuntimeError as exc:
-            if _is_dataloader_shm_error(exc) and (not loader_is_safe):
-                logger.warning("DataLoader shared-memory error detected: %s", exc)
-                train_loader, _ = _build_safe_loader(teacher_train_cfg, distill_cfg, logger)
-                train_iter = cycle(train_loader)
-                loader_is_safe = True
+        batch = None
+        while batch is None:
+            try:
                 batch = next(train_iter).to(device)
-            else:
-                raise
+            except RuntimeError as exc:
+                if _is_dataloader_shm_error(exc) and (not loader_is_safe):
+                    logger.warning("DataLoader shared-memory error detected: %s", exc)
+                    train_loader, _ = _build_safe_loader(teacher_train_cfg, distill_cfg, logger)
+                    train_iter = cycle(train_loader)
+                    loader_is_safe = True
+                elif _is_cuda_oom_error(exc):
+                    logger.warning("CUDA OOM during batch data transfer. Skipping batch.")
+                    if wandb_run is not None:
+                        wandb_run.log({"train/oom_skip_data": 1}, step=step)
+                    optimizer.zero_grad(set_to_none=True)
+                    if device.type == "cuda":
+                        torch.cuda.empty_cache()
+                    gc.collect()
+                else:
+                    raise
         oom_retries = int(getattr(distill_cfg.train, "oom_retries", 8))
         retry_idx = 0
         skip_step = False
@@ -570,7 +579,14 @@ def main():
                 if not _is_cuda_oom_error(exc):
                     raise
                 optimizer.zero_grad(set_to_none=True)
-                torch.cuda.empty_cache()
+                try:
+                    del teacher_pred, ema_pred, student_pred
+                    del loss_dict, loss, pos_low_hat, node_low_hat, edge_low_hat, log_node_low, log_edge_low
+                    del node_high, edge_high, pos_high
+                except NameError:
+                    pass
+                if device.type == "cuda":
+                    torch.cuda.empty_cache()
                 gc.collect()
                 reduced_batch = _reduce_batch_for_oom(batch)
                 if (reduced_batch is None) or (retry_idx >= oom_retries):
@@ -589,6 +605,10 @@ def main():
                     step, retry_idx, batch.num_graphs,
                 )
         if skip_step:
+            try:
+                del batch
+            except NameError:
+                pass
             continue
 
         scalars = {
@@ -599,18 +619,37 @@ def main():
             "train/lr": optimizer.param_groups[0]["lr"],
             "train/grad_norm": float(grad_norm.detach().cpu()) if torch.is_tensor(grad_norm) else float(grad_norm),
         }
+        if device.type == "cuda":
+            scalars["train/mem_alloc_mb"] = float(torch.cuda.memory_allocated(device) / 1024**2)
+            scalars["train/mem_reserv_mb"] = float(torch.cuda.memory_reserved(device) / 1024**2)
+        else:
+            scalars["train/mem_alloc_mb"] = 0.0
+            scalars["train/mem_reserv_mb"] = 0.0
         if wandb_run is not None:
             wandb_run.log(scalars, step=step)
         if step % log_interval == 0:
             logger.info(
-                "step=%d total=%.6f pos=%.6f node=%.6f edge=%.6f",
+                "step=%d total=%.6f pos=%.6f node=%.6f edge=%.6f mem_alloc=%.1fMB",
                 step,
                 scalars["train/loss_total"],
                 scalars["train/loss_pos"],
                 scalars["train/loss_node"],
                 scalars["train/loss_edge"],
+                scalars["train/mem_alloc_mb"],
             )
-        prog.set_postfix(loss=f"{scalars['train/loss_total']:.4f}", t=step)
+        prog.set_postfix(
+            loss=f"{scalars['train/loss_total']:.4f}",
+            alloc_mb=f"{scalars['train/mem_alloc_mb']:.0f}",
+            t=step,
+        )
+
+        try:
+            del teacher_pred, ema_pred, student_pred
+            del loss_dict, loss, batch
+            del pos_low_hat, node_low_hat, edge_low_hat, log_node_low, log_edge_low
+            del node_high, edge_high, pos_high
+        except NameError:
+            pass
 
         if step % ckpt_interval == 0 or step == max_steps:
             step_ckpt = os.path.join(ckpt_dir, f"step_{step}.pt")
