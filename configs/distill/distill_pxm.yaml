@@ -54,7 +54,7 @@ distill:
     num_workers: 4
     pin_memory: false
     persistent_workers: false
-    max_steps: 50000
+    max_steps: 100000
     grad_clip: 1.0
     log_interval: 50
     ckpt_interval: 1000
@@ -71,7 +71,7 @@ distill:
 
 
   online_eval:
-    enabled: false
+    enabled: true
     config_task: "configs/sample/test/sbdd_csd/simple.yml"
     sample_steps: [4]
     num_mols: 100
