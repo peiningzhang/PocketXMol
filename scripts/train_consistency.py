@@ -4,7 +4,10 @@ import gc
 import os
 import subprocess
 from datetime import datetime
-from itertools import cycle
+def cycle(iterable):
+    while True:
+        for x in iterable:
+            yield x
 
 import torch
 import torch.nn.functional as F
@@ -657,6 +660,10 @@ def main():
             del node_high, edge_high, pos_high
         except NameError:
             pass
+        
+        if device.type == "cuda":
+            torch.cuda.empty_cache()
+        gc.collect()
 
         if step % ckpt_interval == 0 or step == max_steps:
             step_ckpt = os.path.join(ckpt_dir, f"step_{step}.pt")
