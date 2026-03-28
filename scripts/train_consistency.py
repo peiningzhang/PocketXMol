@@ -327,17 +327,21 @@ def _save_distill_ckpt(path, step, student, ema_student, optimizer, config, tran
     torch.save(ckpt, path)
 
 
-def _maybe_run_online_eval(config_path, ckpt_path, distill_cfg, logger):
+def _maybe_run_online_eval(config_path, ckpt_path, distill_cfg, logger, wandb_run=None, step=None, device="cuda:0"):
     online_cfg = getattr(distill_cfg, "online_eval", None)
     if online_cfg is None or not getattr(online_cfg, "enabled", False):
         return None
 
     eval_outdir = getattr(online_cfg, "outdir", "outputs_consistency_online_eval")
-    sample_steps = getattr(online_cfg, "sample_steps", [4])
+    sample_steps = [int(s) for s in getattr(online_cfg, "sample_steps", [4])]
     num_mols = int(getattr(online_cfg, "num_mols", 100))
     config_task = online_cfg.config_task
+    test_df_path = getattr(online_cfg, "test_df_path", "data/test/dfs/sbdd_csd.csv")
+    protein_root = getattr(online_cfg, "protein_root", "data/csd/files/proteins")
+    exhaustiveness = int(getattr(online_cfg, "exhaustiveness", 16))
+
     cmd = [
-        sys.executable,
+        "python3",
         "scripts/eval_consistency.py",
         "--config_distill",
         config_path,
@@ -349,15 +353,39 @@ def _maybe_run_online_eval(config_path, ckpt_path, distill_cfg, logger):
         eval_outdir,
         "--num_mols",
         str(num_mols),
+        "--device",
+        device,
+        "--eval_vina",
+        "--test_df_path",
+        test_df_path,
+        "--protein_root",
+        protein_root,
+        "--exhaustiveness",
+        str(exhaustiveness),
         "--sample_steps",
     ] + [str(s) for s in sample_steps]
     logger.info("Run online eval: %s", " ".join(cmd))
+
     try:
+        import glob
+        import pandas as pd
+
         subprocess.run(cmd, check=True)
-    except subprocess.CalledProcessError as exc:
-        logger.warning("Online eval failed: %s", exc)
+        summary_csvs = sorted(glob.glob(os.path.join(eval_outdir, "*", "summary.csv")), key=os.path.getmtime)
+        if summary_csvs and wandb_run is not None and step is not None:
+            df_summary = pd.read_csv(summary_csvs[-1])
+            for _, row in df_summary.iterrows():
+                sample_step = int(row["sample_steps"])
+                metrics = {f"eval_{sample_step}step/{k}": v for k, v in row.to_dict().items()}
+                wandb_run.log(metrics, step=step)
+            logger.info("Evaluation metrics logged to wandb from %s", summary_csvs[-1])
+    except Exception as exc:
+        logger.error("Periodic evaluation failed: %s", exc)
         return None
     return True
+
+
+
 
 
 def main():
@@ -685,7 +713,15 @@ def main():
 
         if step % eval_interval == 0 and step > 0:
             eval_ckpt = os.path.join(ckpt_dir, "last.pt")
-            _maybe_run_online_eval(args.config, eval_ckpt, distill_cfg, logger)
+            _maybe_run_online_eval(
+                args.config,
+                eval_ckpt,
+                distill_cfg,
+                logger,
+                wandb_run=wandb_run,
+                step=step,
+                device=args.device,
+            )
 
     if wandb_run is not None:
         wandb_run.finish()
