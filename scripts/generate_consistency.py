@@ -21,6 +21,7 @@ from utils.consistency import (
     build_transitions,
     get_task_noise_cfg,
     infer_train_config_path_from_ckpt,
+    get_pos_snr_scale,
     normalize_pred_x0,
     renoise_from_pred_x0,
     sample_prior_states,
@@ -108,11 +109,19 @@ def _consistency_sample_batch(batch, model, transitions, total_steps, sample_ste
     schedule = build_sampling_timestep_schedule(total_steps, sample_steps)
 
     outputs = None
-    for i, _ in enumerate(schedule):
-        batch["node_in"] = node_state
-        batch["pos_in"] = pos_state
-        batch["halfedge_in"] = edge_state
-        outputs = model(batch)
+    node_batch = batch["node_type_batch"]
+    for i, t_cur in enumerate(schedule):
+        t_cur_graph = torch.full(
+            (batch.num_graphs,),
+            int(t_cur),
+            dtype=torch.long,
+            device=batch["node_pos"].device,
+        )
+        input_batch = copy.copy(batch)
+        input_batch["node_in"] = node_state
+        input_batch["pos_in"] = pos_state * get_pos_snr_scale(transitions, t_cur_graph, node_batch)
+        input_batch["halfedge_in"] = edge_state
+        outputs = model(input_batch)
         pred_x0 = normalize_pred_x0(outputs)
 
         if i == len(schedule) - 1:
@@ -239,11 +248,19 @@ def main():
         node_prior_cfg=getattr(task_noise_cfg.prior, "node", None),
         edge_prior_cfg=getattr(task_noise_cfg.prior, "edge", None),
         device=device,
+        schedule_type=str(getattr(distill_cfg, "schedule", "karras")),
     )
 
     os.makedirs(args.outdir, exist_ok=True)
     log_dir = get_new_log_dir(args.outdir, prefix="consistency_gen")
     logger = get_logger("consistency_gen", log_dir)
+    logger.info(
+        "Built %s transition grid with %d steps (sigma_min=%.6g, sigma_max=%.6g)",
+        str(getattr(distill_cfg, "schedule", "karras")),
+        int(distill_cfg.num_steps),
+        float(distill_cfg.karras.sigma_min),
+        float(distill_cfg.karras.sigma_max),
+    )
     save_config(distill_cfg_all, os.path.join(log_dir, "distill_config.yml"))
     save_config(task_cfg, os.path.join(log_dir, "task_config.yml"))
 
@@ -304,4 +321,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

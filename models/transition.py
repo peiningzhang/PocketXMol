@@ -7,23 +7,14 @@ from models.diffusion import categorical_kl, extract, index_to_log_onehot, log_1
 
 
 class ContigousTransition(nn.Module):
-    def __init__(self, betas, num_classes=None, scaling=1.):
+    def __init__(self, sigmas, num_classes=None, scaling=1.):
         super().__init__()
         self.num_classes = num_classes
         self.scaling = scaling
-        alphas  = 1. - betas
-        alphas_bar = np.cumprod(alphas, axis=0)
-        alphas_bar_prev = np.concatenate([[1.], alphas_bar[:-1]])
-
-        self.betas = to_torch_const(betas)
-        self.alphas = to_torch_const(alphas)
-        self.alphas_bar = to_torch_const(alphas_bar)
-        self.alphas_bar_prev = to_torch_const(alphas_bar_prev)
-
-        # for q(x_{t-1}|x_0, x_t)
-        self.coef_x0 = to_torch_const(np.sqrt(alphas_bar_prev) * betas / (1 - alphas_bar))
-        self.coef_xt = to_torch_const(np.sqrt(alphas) * (1 - alphas_bar_prev) / (1 - alphas_bar))
-        self.std = to_torch_const(np.sqrt((1 - alphas_bar_prev) * betas / (1 - alphas_bar)))
+        sigmas = np.asarray(sigmas, dtype=np.float64)
+        if sigmas.ndim != 1:
+            raise ValueError("sigmas must be a 1D array.")
+        self.sigmas = to_torch_const(sigmas)
 
     def add_noise(self, x, time_step, batch=None):
         if batch is None:
@@ -31,12 +22,10 @@ class ContigousTransition(nn.Module):
         if self.num_classes is not None:  # categorical values using continuous noise
             x = F.one_hot(x, self.num_classes).float()
         x = x / self.scaling
-        # Xt = a.sqrt() * X0 + (1-a).sqrt() * eps
-        a_bar = self.alphas_bar.index_select(0, time_step)
-        a_bar = a_bar.index_select(0, batch).unsqueeze(-1)
-        noise = torch.zeros_like(x).to(x)
-        noise.normal_()
-        pert = a_bar.sqrt() * x + (1 - a_bar).sqrt() * noise
+        sigma = self.sigmas.index_select(0, time_step)
+        sigma = sigma.index_select(0, batch).unsqueeze(-1)
+        noise = torch.randn_like(x)
+        pert = x + sigma * noise
         pert = torch.where(time_step[batch, None] == 0, x, pert)
         if self.num_classes is None: # continuous values
             return pert
@@ -47,31 +36,20 @@ class ContigousTransition(nn.Module):
     def get_prev_from_recon(self, x_t, x_recon, t, batch=None):
         if batch is None:
             batch = torch.arange(t.shape[0]).to(t.device)
-        # alpha_t = extract(self.alphas, t, batch)
-        # beta_t = extract(self.betas, t, batch)
-        # alpha_bar_t = extract(self.alphas_bar, t, batch)
-        # alpha_bar_t_prev = extract(self.alphas_bar_prev, t, batch)
-        coef_x0 = extract(self.coef_x0, t, batch)
-        coef_xt = extract(self.coef_xt, t, batch)
-
+        t_prev = torch.clamp(t - 1, min=0)
+        sigma_t = extract(self.sigmas, t, batch)
+        sigma_prev = extract(self.sigmas, t_prev, batch)
+        ratio = sigma_prev / sigma_t.clamp(min=1e-12)
         time_zero = (t[batch] == 0).unsqueeze(-1)
-        # alpha_bar_t_prev = torch.where(time_zero, alpha_bar_t, alpha_bar_t_prev)
-
-        # mu = torch.sqrt(alpha_bar_t_prev) * beta_t / (1 - alpha_bar_t) * x_recon + \
-        #     torch.sqrt(alpha_t) * (1 - alpha_bar_t_prev) / (1 - alpha_bar_t) * x_t
-        mu = coef_x0 * x_recon + coef_xt * x_t
-        # sigma = torch.sqrt((1 - alpha_bar_t_prev) * beta_t / (1 - alpha_bar_t))
-        sigma = extract(self.std, t, batch)
-        x_prev = mu + sigma * torch.randn_like(mu)
-        # x_prev = torch.where(time_zero, x_recon, x_prev)
-        x_prev = torch.where(time_zero, mu, x_prev)
+        x_prev = ratio * x_t + (1.0 - ratio) * x_recon
+        x_prev = torch.where(time_zero, x_recon, x_prev)
         return x_prev
 
     def sample_init(self, shape):
         if self.num_classes is None:
-            return torch.randn(shape).to(self.betas.device)
+            return torch.randn(shape).to(self.sigmas.device)
         else:
-            return torch.randn([shape, self.num_classes]).to(self.betas.device)
+            return torch.randn([shape, self.num_classes]).to(self.sigmas.device)
 
 
 class CategoricalTransition(nn.Module):

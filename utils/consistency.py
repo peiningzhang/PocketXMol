@@ -124,7 +124,7 @@ def build_transitions(
     transitions = {
         "sigmas": sigmas,
         "betas": torch.from_numpy(betas).to(sigmas.device),
-        "pos": ContigousTransition(betas).to(sigmas.device),
+        "pos": ContigousTransition(sigmas.detach().cpu().numpy()).to(sigmas.device),
         "node": GeneralCategoricalTransition(betas, num_node_types, init_prob=node_init_prob).to(sigmas.device),
         "edge": GeneralCategoricalTransition(betas, num_edge_types, init_prob=edge_init_prob).to(sigmas.device),
     }
@@ -137,6 +137,19 @@ def normalize_pred_x0(outputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tenso
         "pred_halfedge_logits_x0": outputs["pred_halfedge"],
         "pred_pos_x0": outputs["pred_pos"],
     }
+
+
+def get_pos_snr_scale(
+    transitions: Dict[str, object],
+    t_graph: torch.Tensor,
+    node_batch: torch.Tensor,
+) -> torch.Tensor:
+    # VE state is x = x0 + sigma * eps. Multiplying by 1 / sqrt(1 + sigma^2)
+    # maps it to the VP form sqrt(alpha_bar) * x0 + sqrt(1 - alpha_bar) * eps
+    # with alpha_bar = 1 / (1 + sigma^2), which matches the pretrained x0-prediction teacher.
+    sigmas = transitions["sigmas"].index_select(0, t_graph)
+    sigmas = sigmas.index_select(0, node_batch).unsqueeze(-1)
+    return torch.rsqrt(1.0 + sigmas * sigmas)
 
 
 @torch.no_grad()
@@ -192,4 +205,3 @@ def renoise_from_pred_x0(
     log_edge_x0 = F.log_softmax(pred_x0["pred_halfedge_logits_x0"], dim=-1)
     edge_next, _ = transitions["edge"].q_vt_sample(log_edge_x0, t_next_graph, batch=edge_batch)
     return node_next, pos_next, edge_next
-

@@ -65,7 +65,7 @@ distill:
     project: "pocketxmol-consistency"
     name: "sbdd-distill-run1"
     entity: ""
-    id: "p3pyptv4"          # optional fixed run id
+    id: ""                  # optional fixed run id
     resume: "allow" # allow | must | never
 
 
@@ -79,4 +79,3 @@ distill:
 
   # Optional default ckpt for eval script
   eval_checkpoint: ""
-

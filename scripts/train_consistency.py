@@ -27,6 +27,7 @@ from utils.consistency import (
     get_task_noise_cfg,
     infer_train_config_path_from_ckpt,
     normalize_pred_x0,
+    get_pos_snr_scale,
     to_plain_dict,
 )
 from utils.dataset import ForeverTaskDataset
@@ -511,17 +512,20 @@ def main():
                     device=device,
                     dtype=torch.long,
                 )
+                t_low_graph = torch.clamp(t_high_graph - 1, min=0)
 
                 node_high, log_node_high, _ = transitions["node"].add_noise(batch["node_type"], t_high_graph, batch=node_batch)
                 edge_high, log_edge_high, _ = transitions["edge"].add_noise(batch["halfedge_type"], t_high_graph, batch=edge_batch)
                 pos_high = transitions["pos"].add_noise(batch["node_pos"], t_high_graph, batch=node_batch)
+                pos_high_in = pos_high * get_pos_snr_scale(transitions, t_high_graph, node_batch)
 
-                batch["node_in"] = node_high
-                batch["halfedge_in"] = edge_high
-                batch["pos_in"] = pos_high
+                teacher_batch = copy.copy(batch)
+                teacher_batch["node_in"] = node_high
+                teacher_batch["halfedge_in"] = edge_high
+                teacher_batch["pos_in"] = pos_high_in
 
                 with torch.no_grad():
-                    teacher_pred = normalize_pred_x0(teacher(batch))
+                    teacher_pred = normalize_pred_x0(teacher(teacher_batch))
                     teacher_log_node_x0 = F.log_softmax(teacher_pred["pred_node_logits_x0"], dim=-1)
                     teacher_log_edge_x0 = F.log_softmax(teacher_pred["pred_halfedge_logits_x0"], dim=-1)
 
@@ -548,15 +552,18 @@ def main():
                     )
                     edge_low_hat = log_sample_categorical(log_edge_low)
 
-                    batch["node_in"] = node_low_hat
-                    batch["halfedge_in"] = edge_low_hat
-                    batch["pos_in"] = pos_low_hat
-                    ema_pred = normalize_pred_x0(ema_student(batch))
+                    pos_low_in = pos_low_hat * get_pos_snr_scale(transitions, t_low_graph, node_batch)
+                    ema_batch = copy.copy(batch)
+                    ema_batch["node_in"] = node_low_hat
+                    ema_batch["halfedge_in"] = edge_low_hat
+                    ema_batch["pos_in"] = pos_low_in
+                    ema_pred = normalize_pred_x0(ema_student(ema_batch))
 
-                batch["node_in"] = node_high
-                batch["halfedge_in"] = edge_high
-                batch["pos_in"] = pos_high
-                student_pred = normalize_pred_x0(student(batch))
+                student_batch = copy.copy(batch)
+                student_batch["node_in"] = node_high
+                student_batch["halfedge_in"] = edge_high
+                student_batch["pos_in"] = pos_high_in
+                student_pred = normalize_pred_x0(student(student_batch))
 
                 loss_dict = loss_fn(
                     student_pred_x0=student_pred,
@@ -680,4 +687,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
