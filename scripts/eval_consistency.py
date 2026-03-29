@@ -151,6 +151,7 @@ def _post_process_batch(batch, outputs, featurizer, sdf_dir, i_saved, logger):
     data_list = [{k: batch[k][i] for k in info_keys} for i in range(len(batch))]
     generated_list, outputs_list, _ = seperate_outputs2(batch, outputs, trajs=None, off_tqdm=True)
 
+    repeat_values = batch["i_repeat"] if "i_repeat" in batch else torch.zeros(len(generated_list), dtype=torch.long, device=batch["node_pos"].device)
     rows = []
     for i_mol in range(len(generated_list)):
         mol_info = featurizer.decode_output(**generated_list[i_mol])
@@ -187,6 +188,7 @@ def _post_process_batch(batch, outputs, featurizer, sdf_dir, i_saved, logger):
                 "cfd_pos": cfd_pos,
                 "cfd_node": cfd_node,
                 "cfd_edge": cfd_edge,
+                "i_repeat": int(repeat_values[i_mol].item()),
             }
         )
         i_saved += 1
@@ -296,30 +298,43 @@ def main():
     save_config(distill_cfg_all, os.path.join(log_dir, "distill_config.yml"))
     save_config(task_cfg, os.path.join(log_dir, "task_config.yml"))
 
+    num_repeats = int(getattr(task_cfg.sample, "num_repeats", 1))
     summary_rows = []
     for sample_steps in args.sample_steps:
         step_dir = os.path.join(log_dir, f"steps_{sample_steps}")
         sdf_dir = os.path.join(step_dir, "SDF")
         os.makedirs(sdf_dir, exist_ok=True)
         logger.info("Evaluating %d-step consistency sampling...", sample_steps)
+        logger.info("Sampling with n_repeats=%d (target num_mols=%d)", num_repeats, int(args.num_mols))
 
         i_saved = 0
         all_rows = []
         time_start = time.time()
-        for batch in tqdm(loader, desc=f"Sampling {sample_steps}-step"):
+        for i_repeat in range(num_repeats):
+            logger.info("Generating molecules. Testset repeat %d.", i_repeat)
+            for batch in tqdm(loader, desc=f"Sampling {sample_steps}-step repeat {i_repeat}"):
+                if i_saved >= args.num_mols:
+                    break
+                batch = batch.to(device)
+                batch["i_repeat"] = torch.full(
+                    (batch.num_graphs,),
+                    int(i_repeat),
+                    dtype=torch.long,
+                    device=device,
+                )
+                batch, outputs = _consistency_sample_batch(
+                    batch=batch,
+                    model=model,
+                    transitions=transitions,
+                    total_steps=int(distill_cfg.num_steps),
+                    sample_steps=int(sample_steps),
+                    sigma_max=float(distill_cfg.karras.sigma_max),
+                )
+                rows, i_saved = _post_process_batch(batch, outputs, featurizer, sdf_dir, i_saved, logger)
+                all_rows.extend(rows)
             if i_saved >= args.num_mols:
+                logger.info("Enough molecules. Stop sampling.")
                 break
-            batch = batch.to(device)
-            batch, outputs = _consistency_sample_batch(
-                batch=batch,
-                model=model,
-                transitions=transitions,
-                total_steps=int(distill_cfg.num_steps),
-                sample_steps=int(sample_steps),
-                sigma_max=float(distill_cfg.karras.sigma_max),
-            )
-            rows, i_saved = _post_process_batch(batch, outputs, featurizer, sdf_dir, i_saved, logger)
-            all_rows.extend(rows)
         wall_time = time.time() - time_start
 
         df_info = pd.DataFrame(all_rows)
