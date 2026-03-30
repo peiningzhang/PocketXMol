@@ -22,6 +22,7 @@ from utils.consistency import (
     build_sampling_timestep_schedule,
     build_transitions,
     get_task_noise_cfg,
+    get_sampling_update_modes,
     infer_train_config_path_from_ckpt,
     get_pos_snr_scale,
     normalize_pred_x0,
@@ -106,7 +107,16 @@ def _build_test_loader(train_config, task_config, batch_size, num_workers):
 
 
 @torch.no_grad()
-def _consistency_sample_batch(batch, model, transitions, total_steps, sample_steps, sigma_max):
+def _consistency_sample_batch(
+    batch,
+    model,
+    transitions,
+    total_steps,
+    sample_steps,
+    sigma_max,
+    coordinate_update,
+    discrete_update,
+):
     node_state, pos_state, edge_state = sample_prior_states(batch, transitions, sigma_max=sigma_max)
     schedule = build_sampling_timestep_schedule(total_steps, sample_steps)
 
@@ -138,7 +148,16 @@ def _consistency_sample_batch(batch, model, transitions, total_steps, sample_ste
                 dtype=torch.long,
                 device=batch["node_pos"].device,
             )
-            node_state, pos_state, edge_state = renoise_from_pred_x0(pred_x0, t_next_graph, batch, transitions)
+            node_state, pos_state, edge_state = renoise_from_pred_x0(
+                pred_x0,
+                pos_state,
+                t_cur_graph,
+                t_next_graph,
+                batch,
+                transitions,
+                coordinate_update=coordinate_update,
+                discrete_update=discrete_update,
+            )
 
     batch["node_type"] = node_state
     batch["node_pos"] = pos_state
@@ -272,6 +291,7 @@ def main():
     model.eval()
 
     task_noise_cfg = get_task_noise_cfg(teacher_train_cfg.noise, distill_cfg.task_name)
+    coordinate_update, discrete_update = get_sampling_update_modes(distill_cfg)
     transitions = build_transitions(
         num_steps=int(distill_cfg.num_steps),
         sigma_min=float(distill_cfg.karras.sigma_min),
@@ -294,6 +314,11 @@ def main():
         int(distill_cfg.num_steps),
         float(distill_cfg.karras.sigma_min),
         float(distill_cfg.karras.sigma_max),
+    )
+    logger.info(
+        "Sampling update modes: coordinate=%s, discrete=%s",
+        coordinate_update,
+        discrete_update,
     )
     save_config(distill_cfg_all, os.path.join(log_dir, "distill_config.yml"))
     save_config(task_cfg, os.path.join(log_dir, "task_config.yml"))
@@ -329,6 +354,8 @@ def main():
                     total_steps=int(distill_cfg.num_steps),
                     sample_steps=int(sample_steps),
                     sigma_max=float(distill_cfg.karras.sigma_max),
+                    coordinate_update=coordinate_update,
+                    discrete_update=discrete_update,
                 )
                 rows, i_saved = _post_process_batch(batch, outputs, featurizer, sdf_dir, i_saved, logger)
                 all_rows.extend(rows)

@@ -31,6 +31,9 @@ distill:
     sigma_min: 0.002
     sigma_max: 80.0
     rho: 7.0
+  sampling:
+    coordinate_update: snr_renoise
+    discrete_update: categorical_transition
 
   # Loss
   loss_weights:

@@ -139,6 +139,15 @@ def normalize_pred_x0(outputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tenso
     }
 
 
+def get_sampling_update_modes(distill_cfg) -> Tuple[str, str]:
+    sampling_cfg = getattr(distill_cfg, "sampling", None)
+    if sampling_cfg is None:
+        return "snr_renoise", "categorical_transition"
+    coordinate_update = str(getattr(sampling_cfg, "coordinate_update", "snr_renoise"))
+    discrete_update = str(getattr(sampling_cfg, "discrete_update", "categorical_transition"))
+    return coordinate_update, discrete_update
+
+
 def get_pos_snr_scale(
     transitions: Dict[str, object],
     t_graph: torch.Tensor,
@@ -188,20 +197,78 @@ def sample_prior_states(
     return node_state, pos_state, edge_state
 
 
-def renoise_from_pred_x0(
+def update_coordinate_state(
+    pred_pos_x0: torch.Tensor,
+    pos_state: torch.Tensor,
+    t_cur_graph: torch.Tensor,
+    t_next_graph: torch.Tensor,
+    batch,
+    transitions: Dict[str, object],
+    coordinate_update: str,
+) -> torch.Tensor:
+    node_batch = batch["node_type_batch"]
+    if coordinate_update == "snr_renoise":
+        return transitions["pos"].add_noise(pred_pos_x0, t_next_graph, batch=node_batch)
+    if coordinate_update == "euler":
+        sigma_cur = transitions["sigmas"].index_select(0, t_cur_graph)
+        sigma_cur = sigma_cur.index_select(0, node_batch).unsqueeze(-1)
+        sigma_next = transitions["sigmas"].index_select(0, t_next_graph)
+        sigma_next = sigma_next.index_select(0, node_batch).unsqueeze(-1)
+        sigma_cur = sigma_cur.clamp(min=1e-12)
+        pred_eps = (pos_state - pred_pos_x0) / sigma_cur
+        return pos_state + (sigma_next - sigma_cur) * pred_eps
+    if coordinate_update in {"direct_x0", "x0"}:
+        return pred_pos_x0
+    raise ValueError(f"Unknown coordinate update mode: {coordinate_update}")
+
+
+def update_discrete_state(
     pred_x0: Dict[str, torch.Tensor],
     t_next_graph: torch.Tensor,
     batch,
     transitions: Dict[str, object],
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    discrete_update: str,
+) -> Tuple[torch.Tensor, torch.Tensor]:
     node_batch = batch["node_type_batch"]
     edge_batch = batch["halfedge_type_batch"]
+    if discrete_update == "categorical_transition":
+        log_node_x0 = F.log_softmax(pred_x0["pred_node_logits_x0"], dim=-1)
+        node_next, _ = transitions["node"].q_vt_sample(log_node_x0, t_next_graph, batch=node_batch)
 
-    pos_next = transitions["pos"].add_noise(pred_x0["pred_pos_x0"], t_next_graph, batch=node_batch)
+        log_edge_x0 = F.log_softmax(pred_x0["pred_halfedge_logits_x0"], dim=-1)
+        edge_next, _ = transitions["edge"].q_vt_sample(log_edge_x0, t_next_graph, batch=edge_batch)
+        return node_next, edge_next
+    if discrete_update in {"argmax", "direct_x0"}:
+        node_next = pred_x0["pred_node_logits_x0"].argmax(dim=-1)
+        edge_next = pred_x0["pred_halfedge_logits_x0"].argmax(dim=-1)
+        return node_next, edge_next
+    raise ValueError(f"Unknown discrete update mode: {discrete_update}")
 
-    log_node_x0 = F.log_softmax(pred_x0["pred_node_logits_x0"], dim=-1)
-    node_next, _ = transitions["node"].q_vt_sample(log_node_x0, t_next_graph, batch=node_batch)
 
-    log_edge_x0 = F.log_softmax(pred_x0["pred_halfedge_logits_x0"], dim=-1)
-    edge_next, _ = transitions["edge"].q_vt_sample(log_edge_x0, t_next_graph, batch=edge_batch)
+def renoise_from_pred_x0(
+    pred_x0: Dict[str, torch.Tensor],
+    pos_state: torch.Tensor,
+    t_cur_graph: torch.Tensor,
+    t_next_graph: torch.Tensor,
+    batch,
+    transitions: Dict[str, object],
+    coordinate_update: str = "snr_renoise",
+    discrete_update: str = "categorical_transition",
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    pos_next = update_coordinate_state(
+        pred_x0["pred_pos_x0"],
+        pos_state,
+        t_cur_graph,
+        t_next_graph,
+        batch,
+        transitions,
+        coordinate_update,
+    )
+    node_next, edge_next = update_discrete_state(
+        pred_x0,
+        t_next_graph,
+        batch,
+        transitions,
+        discrete_update,
+    )
     return node_next, pos_next, edge_next
