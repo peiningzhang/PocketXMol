@@ -16,6 +16,7 @@ import sys
 sys.path.append(".")
 
 from evaluate.evaluate_mols import evaluate_mol_dict, get_mols_dict_from_gen_path
+from evaluate.standard_eval_helper import run_standard_sdf_eval, summarize_standard_sdf_eval
 from models.maskfill import PMAsymDenoiser
 from models.sample import seperate_outputs2
 from utils.consistency import (
@@ -116,6 +117,7 @@ def _consistency_sample_batch(
     sigma_max,
     coordinate_update,
     discrete_update,
+    sampling_cfg,
 ):
     node_state, pos_state, edge_state = sample_prior_states(batch, transitions, sigma_max=sigma_max)
     schedule = build_sampling_timestep_schedule(total_steps, sample_steps)
@@ -157,6 +159,7 @@ def _consistency_sample_batch(
                 transitions,
                 coordinate_update=coordinate_update,
                 discrete_update=discrete_update,
+                sampling_cfg=sampling_cfg,
             )
 
     batch["node_type"] = node_state
@@ -264,6 +267,13 @@ def main():
     parser.add_argument("--test_df_path", type=str, default="data/test/dfs/sbdd_csd.csv")
     parser.add_argument("--protein_root", type=str, default="data/csd/files/proteins")
     parser.add_argument("--exhaustiveness", type=int, default=16)
+    parser.add_argument("--standard_eval", action="store_true")
+    parser.add_argument("--standard_split_by_name_path", type=str, default="/shared/healthinfolab/phz24002/AliDiff/data/split_by_name.pt")
+    parser.add_argument("--standard_test_set_root", type=str, default="/shared/healthinfolab/phz24002/AliDiff/data/test_set")
+    parser.add_argument("--standard_docking_mode", type=str, default="vina_score", choices=["none", "vina_score", "vina_dock"])
+    parser.add_argument("--standard_n_workers", type=int, default=1)
+    parser.add_argument("--standard_max_mols", type=int, default=0)
+    parser.add_argument("--standard_exhaustiveness", type=int, default=16)
     parser.add_argument("--use_ema", dest="use_ema", action="store_true")
     parser.add_argument("--no_use_ema", dest="use_ema", action="store_false")
     parser.set_defaults(use_ema=True)
@@ -292,6 +302,7 @@ def main():
 
     task_noise_cfg = get_task_noise_cfg(teacher_train_cfg.noise, distill_cfg.task_name)
     coordinate_update, discrete_update = get_sampling_update_modes(distill_cfg)
+    sampling_cfg = getattr(distill_cfg, "sampling", None)
     transitions = build_transitions(
         num_steps=int(distill_cfg.num_steps),
         sigma_min=float(distill_cfg.karras.sigma_min),
@@ -356,6 +367,7 @@ def main():
                     sigma_max=float(distill_cfg.karras.sigma_max),
                     coordinate_update=coordinate_update,
                     discrete_update=discrete_update,
+                    sampling_cfg=sampling_cfg,
                 )
                 rows, i_saved = _post_process_batch(batch, outputs, featurizer, sdf_dir, i_saved, logger)
                 all_rows.extend(rows)
@@ -376,8 +388,26 @@ def main():
             metric_path=step_dir,
         )
 
+        if args.standard_eval:
+            standard_result_path = os.path.join(step_dir, "SDF", "eval_results_standard")
+            logger.info(
+                "Running standard SDF evaluation: docking_mode=%s, n_workers=%d",
+                args.standard_docking_mode,
+                int(args.standard_n_workers),
+            )
+            run_standard_sdf_eval(
+                step_dir=step_dir,
+                split_by_name_path=args.standard_split_by_name_path,
+                test_set_root=args.standard_test_set_root,
+                docking_mode=args.standard_docking_mode,
+                exhaustiveness=args.standard_exhaustiveness,
+                n_workers=args.standard_n_workers,
+                max_mols=args.standard_max_mols,
+                result_path=standard_result_path,
+            )
+
         # Optional vina (heavy, requires local data paths prepared)
-        if args.eval_vina:
+        if args.eval_vina and not args.standard_eval:
             from evaluate.evaluate_sbdd import add_ref_protein_dict, calc_vina
 
             dock_inputs = add_ref_protein_dict(mols_dict, step_dir, args.test_df_path)
@@ -385,12 +415,19 @@ def main():
 
         summary = _summarize_step_metrics(step_dir, wall_time=wall_time, n_samples=len(df_info))
         summary["sample_steps"] = int(sample_steps)
+        if args.standard_eval:
+            standard_result_path = os.path.join(step_dir, "SDF", "eval_results_standard")
+            summary.update(summarize_standard_sdf_eval(standard_result_path, prefix="standard"))
         if args.eval_vina:
             vina_path = os.path.join(step_dir, "vina.csv")
             if os.path.exists(vina_path):
                 vina_df = pd.read_csv(vina_path)
                 if "vina_score" in vina_df.columns:
                     summary["vina_score_mean"] = float(vina_df["vina_score"].mean())
+        if args.standard_eval and args.standard_docking_mode == "vina_score":
+            # Keep compatibility with the old summary schema.
+            if "standard_vina_score_mean" in summary and "vina_score_mean" not in summary:
+                summary["vina_score_mean"] = summary["standard_vina_score_mean"]
         summary_rows.append(summary)
         logger.info("Summary@%d-step: %s", sample_steps, summary)
 

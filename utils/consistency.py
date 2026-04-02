@@ -161,6 +161,11 @@ def get_pos_snr_scale(
     return torch.rsqrt(1.0 + sigmas * sigmas)
 
 
+def _gather_sigma(transitions: Dict[str, object], t_graph: torch.Tensor, batch_index: torch.Tensor) -> torch.Tensor:
+    sigmas = transitions["sigmas"].index_select(0, t_graph)
+    return sigmas.index_select(0, batch_index).unsqueeze(-1)
+
+
 @torch.no_grad()
 def ema_update_(ema_model: torch.nn.Module, model: torch.nn.Module, decay: float):
     for ema_p, p in zip(ema_model.parameters(), model.parameters()):
@@ -210,10 +215,8 @@ def update_coordinate_state(
     if coordinate_update == "snr_renoise":
         return transitions["pos"].add_noise(pred_pos_x0, t_next_graph, batch=node_batch)
     if coordinate_update == "euler":
-        sigma_cur = transitions["sigmas"].index_select(0, t_cur_graph)
-        sigma_cur = sigma_cur.index_select(0, node_batch).unsqueeze(-1)
-        sigma_next = transitions["sigmas"].index_select(0, t_next_graph)
-        sigma_next = sigma_next.index_select(0, node_batch).unsqueeze(-1)
+        sigma_cur = _gather_sigma(transitions, t_cur_graph, node_batch)
+        sigma_next = _gather_sigma(transitions, t_next_graph, node_batch)
         sigma_cur = sigma_cur.clamp(min=1e-12)
         pred_eps = (pos_state - pred_pos_x0) / sigma_cur
         return pos_state + (sigma_next - sigma_cur) * pred_eps
@@ -222,12 +225,69 @@ def update_coordinate_state(
     raise ValueError(f"Unknown coordinate update mode: {coordinate_update}")
 
 
+def campbell_dfm_step(
+    current_v: torch.Tensor,
+    pred_logits: torch.Tensor,
+    sigma_i: torch.Tensor,
+    sigma_next: torch.Tensor,
+    eps: float = 1e-5,
+    sigma_data: float = 1.0,
+    stochasticity: float = 2.0,
+) -> torch.Tensor:
+    """
+    Campbell-style discrete update for a categorical state.
+
+    This follows the local heuristic in the user's reference:
+    predict a clean categorical proposal from `pred_logits`, then replace a
+    subset of current categories with the proposal, with an optional
+    stochastic resampling term.
+    """
+    num_classes = pred_logits.shape[-1]
+    device = pred_logits.device
+    p_1_given_t = F.softmax(pred_logits, dim=-1)
+
+    sigma_data_t = torch.as_tensor(sigma_data, device=device, dtype=sigma_i.dtype)
+    stochasticity_t = torch.as_tensor(stochasticity, device=device, dtype=sigma_i.dtype)
+
+    mask_rate = sigma_i / (sigma_i + sigma_data_t)
+    mask_rate_next = sigma_next / (sigma_next + sigma_data_t)
+    t = 1.0 - mask_rate
+    t_next = 1.0 - mask_rate_next
+
+    dt = (t_next - t).clamp(min=0.0)
+    alpha_t = t.clamp(min=0.0, max=1.0 - eps)
+    alpha_t_next = t_next.clamp(min=0.0, max=1.0 - eps)
+    alpha_t_prime = (alpha_t_next - alpha_t) / dt.clamp(min=1e-12)
+
+    mask_rate_derivative = sigma_data_t / (sigma_i + sigma_data_t).pow(2)
+    stochasticity_term = stochasticity_t / mask_rate_derivative.clamp(min=1e-12)
+
+    unmask_prob = dt * (alpha_t_prime + stochasticity_term * alpha_t) / (1.0 - alpha_t).clamp(min=eps)
+    mask_prob = dt * stochasticity_term
+    unmask_prob = unmask_prob.clamp(min=0.0, max=1.0)
+    mask_prob = mask_prob.clamp(min=0.0, max=1.0)
+    denom = (unmask_prob + mask_prob).clamp(min=eps)
+    unmask_prob = unmask_prob / denom
+
+    x1 = torch.distributions.Categorical(probs=p_1_given_t).sample()
+    will_unmask = torch.rand(current_v.shape[0], device=device) < unmask_prob.squeeze(-1)
+
+    v_next = current_v.clone()
+    v_next[will_unmask] = x1[will_unmask]
+
+    # Keep the local probability tensor around for possible future logging/debugging.
+    _ = num_classes
+    return v_next
+
+
 def update_discrete_state(
     pred_x0: Dict[str, torch.Tensor],
+    t_cur_graph: torch.Tensor,
     t_next_graph: torch.Tensor,
     batch,
     transitions: Dict[str, object],
     discrete_update: str,
+    sampling_cfg=None,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     node_batch = batch["node_type_batch"]
     edge_batch = batch["halfedge_type_batch"]
@@ -237,6 +297,30 @@ def update_discrete_state(
 
         log_edge_x0 = F.log_softmax(pred_x0["pred_halfedge_logits_x0"], dim=-1)
         edge_next, _ = transitions["edge"].q_vt_sample(log_edge_x0, t_next_graph, batch=edge_batch)
+        return node_next, edge_next
+    if discrete_update == "campbell_dfm":
+        sigma_data = float(getattr(sampling_cfg, "campbell_sigma_data", 1.0)) if sampling_cfg is not None else 1.0
+        stochasticity = float(getattr(sampling_cfg, "campbell_stochasticity", 2.0)) if sampling_cfg is not None else 2.0
+        sigma_node_cur = _gather_sigma(transitions, t_cur_graph, node_batch)
+        sigma_node_next = _gather_sigma(transitions, t_next_graph, node_batch)
+        sigma_edge_cur = _gather_sigma(transitions, t_cur_graph, edge_batch)
+        sigma_edge_next = _gather_sigma(transitions, t_next_graph, edge_batch)
+        node_next = campbell_dfm_step(
+            batch["node_type"],
+            pred_x0["pred_node_logits_x0"],
+            sigma_node_cur,
+            sigma_node_next,
+            sigma_data=sigma_data,
+            stochasticity=stochasticity,
+        )
+        edge_next = campbell_dfm_step(
+            batch["halfedge_type"],
+            pred_x0["pred_halfedge_logits_x0"],
+            sigma_edge_cur,
+            sigma_edge_next,
+            sigma_data=sigma_data,
+            stochasticity=stochasticity,
+        )
         return node_next, edge_next
     if discrete_update in {"argmax", "direct_x0"}:
         node_next = pred_x0["pred_node_logits_x0"].argmax(dim=-1)
@@ -254,6 +338,7 @@ def renoise_from_pred_x0(
     transitions: Dict[str, object],
     coordinate_update: str = "snr_renoise",
     discrete_update: str = "categorical_transition",
+    sampling_cfg=None,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     pos_next = update_coordinate_state(
         pred_x0["pred_pos_x0"],
@@ -266,9 +351,11 @@ def renoise_from_pred_x0(
     )
     node_next, edge_next = update_discrete_state(
         pred_x0,
+        t_cur_graph,
         t_next_graph,
         batch,
         transitions,
         discrete_update,
+        sampling_cfg=sampling_cfg,
     )
     return node_next, pos_next, edge_next

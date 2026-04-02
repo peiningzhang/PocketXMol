@@ -34,6 +34,8 @@ distill:
   sampling:
     coordinate_update: snr_renoise
     discrete_update: categorical_transition
+    campbell_sigma_data: 1.0
+    campbell_stochasticity: 2.0
 
   # Loss
   loss_weights:

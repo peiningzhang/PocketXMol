@@ -1,5 +1,6 @@
 from rdkit import Chem
 import numpy as np
+import pandas as pd
 from tqdm import tqdm
 from .scoring_func import *
 from multiprocessing import Pool
@@ -338,24 +339,37 @@ def calculate_validity(output_dir, mol_dict=None):
     """
     Calculate the validity and connectivity of the sampled molecules
     """
+    gen_info_path = os.path.join(output_dir, "gen_info.csv")
+    if os.path.exists(gen_info_path):
+        df_info = pd.read_csv(gen_info_path)
+        tags = df_info["tag"].fillna("")
+        total = max(len(tags), 1)
+        bad = int((tags == "bad").sum())
+        incomp = int((tags == "incomp").sum())
+        success = total - bad - incomp
+        validity = float((success + incomp) / total)
+        connectivity = float(success / max(success + incomp, 1))
+        return {"validity": validity, "connectivity": connectivity}
+
     samples_path = os.path.join(output_dir, 'samples_all.pt')
     if not os.path.exists(samples_path):
-        # print('samples_all.pt not found. cannot calculate validity and connectivity')
         if mol_dict is None or len(mol_dict) == 0:
             return {'validity': np.nan, 'connectivity': np.nan}
-        mols = [m for m in mol_dict.values() if m is not None]
-        if not mols:
-            return {'validity': np.nan, 'connectivity': np.nan}
+        total = len(mol_dict)
+        valid = [m for m in mol_dict.values() if m is not None]
+        if not valid:
+            return {'validity': 0.0, 'connectivity': np.nan}
         connected = 0
-        for mol in mols:
+        for mol in valid:
             try:
                 smi = Chem.MolToSmiles(mol)
                 if smi and '.' not in smi:
                     connected += 1
             except Exception:
                 pass
-        connectivity = connected / len(mols)
-        return {'validity': np.nan, 'connectivity': connectivity}
+        validity = len(valid) / total
+        connectivity = connected / len(valid)
+        return {'validity': validity, 'connectivity': connectivity}
 
     pool = torch.load(samples_path)
 

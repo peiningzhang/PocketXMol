@@ -14,6 +14,7 @@ import sys
 sys.path.append(".")
 
 from evaluate.evaluate_mols import evaluate_mol_dict, get_mols_dict_from_gen_path
+from evaluate.standard_eval_helper import run_standard_sdf_eval, summarize_standard_sdf_eval
 from utils.docking_vina import VinaDockingTask
 from utils.misc import get_logger
 
@@ -168,6 +169,13 @@ def main():
     parser.add_argument("--protein_root", type=str, default="data/csd/files/proteins")
     parser.add_argument("--exhaustiveness", type=int, default=16)
     parser.add_argument("--vina_workers", type=int, default=16)
+    parser.add_argument("--standard_eval", action="store_true")
+    parser.add_argument("--standard_split_by_name_path", type=str, default="/shared/healthinfolab/phz24002/AliDiff/data/split_by_name.pt")
+    parser.add_argument("--standard_test_set_root", type=str, default="/shared/healthinfolab/phz24002/AliDiff/data/test_set")
+    parser.add_argument("--standard_docking_mode", type=str, default="vina_score", choices=["none", "vina_score", "vina_dock"])
+    parser.add_argument("--standard_n_workers", type=int, default=1)
+    parser.add_argument("--standard_max_mols", type=int, default=0)
+    parser.add_argument("--standard_exhaustiveness", type=int, default=16)
     parser.add_argument(
         "--vina_modes",
         type=str,
@@ -193,7 +201,26 @@ def main():
         row.update(_summarize_from_files(step_dir))
         row.update(_collect_metric_summary(step_dir))
 
-        if args.eval_vina:
+        if args.standard_eval:
+            standard_result_path = os.path.join(step_dir, "SDF", "eval_results_standard")
+            logger.info(
+                "Running standard SDF evaluation: docking_mode=%s, n_workers=%d",
+                args.standard_docking_mode,
+                int(args.standard_n_workers),
+            )
+            run_standard_sdf_eval(
+                step_dir=step_dir,
+                split_by_name_path=args.standard_split_by_name_path,
+                test_set_root=args.standard_test_set_root,
+                docking_mode=args.standard_docking_mode,
+                exhaustiveness=args.standard_exhaustiveness,
+                n_workers=args.standard_n_workers,
+                max_mols=args.standard_max_mols,
+                result_path=standard_result_path,
+            )
+            row.update(summarize_standard_sdf_eval(standard_result_path, prefix="standard"))
+
+        if args.eval_vina and not args.standard_eval:
             dock_inputs = _add_ref_protein_dict(mols_dict, step_dir)
             if len(dock_inputs) == 0:
                 logger.warning("No eligible molecules for Vina (likely all tagged bad/incomp).")
@@ -244,4 +271,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

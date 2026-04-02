@@ -114,6 +114,7 @@ def _consistency_sample_batch(
     sigma_max,
     coordinate_update,
     discrete_update,
+    sampling_cfg,
 ):
     node_state, pos_state, edge_state = sample_prior_states(batch, transitions, sigma_max=sigma_max)
     schedule = build_sampling_timestep_schedule(total_steps, sample_steps)
@@ -155,6 +156,7 @@ def _consistency_sample_batch(
                 transitions,
                 coordinate_update=coordinate_update,
                 discrete_update=discrete_update,
+                sampling_cfg=sampling_cfg,
             )
 
     batch["node_type"] = node_state
@@ -258,6 +260,7 @@ def main():
 
     task_noise_cfg = get_task_noise_cfg(teacher_train_cfg.noise, distill_cfg.task_name)
     coordinate_update, discrete_update = get_sampling_update_modes(distill_cfg)
+    sampling_cfg = getattr(distill_cfg, "sampling", None)
     transitions = build_transitions(
         num_steps=int(distill_cfg.num_steps),
         sigma_min=float(distill_cfg.karras.sigma_min),
@@ -314,6 +317,7 @@ def main():
                     sigma_max=float(distill_cfg.karras.sigma_max),
                     coordinate_update=coordinate_update,
                     discrete_update=discrete_update,
+                    sampling_cfg=sampling_cfg,
                 )
                 rows, i_saved = _post_process_batch(batch, outputs, featurizer, sdf_dir, i_saved)
                 for row in rows:
