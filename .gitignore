@@ -1,0 +1,5 @@
+.codex/
+.vscode/
+data/
+outputs*/
+wandb/
