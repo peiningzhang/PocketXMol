@@ -3,3 +3,12 @@
 data/
 outputs*/
 wandb/
+__pycache__/
+*.pyc
+nohup.out
+*.log
+tmp/
+logs/
+raw_files/
+data_train/
+run_eval_gpu36.sh
