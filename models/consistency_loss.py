@@ -15,6 +15,21 @@ def _masked_mean(values: torch.Tensor, mask: Optional[torch.Tensor]) -> torch.Te
     return (values * mask.float()).sum() / denom
 
 
+def _weighted_masked_mean(
+    values: torch.Tensor,
+    mask: Optional[torch.Tensor],
+    weights: Optional[torch.Tensor],
+) -> torch.Tensor:
+    if weights is None:
+        return _masked_mean(values, mask)
+    if weights.ndim > 1:
+        weights = weights.reshape(weights.shape[0], -1).mean(dim=-1)
+    if mask is not None:
+        weights = weights * mask.float()
+    denom = weights.sum().clamp(min=1.0)
+    return (values * weights).sum() / denom
+
+
 def compute_joint_physics_loss(
     pred_pos_x0: torch.Tensor,
     pred_node_logits_x0: torch.Tensor,
@@ -32,12 +47,14 @@ class MixedStateConsistencyLoss(nn.Module):
         pos_weight: float = 1.0,
         node_weight: float = 1.0,
         edge_weight: float = 1.0,
+        edge_positive_weight: float = 1.0,
         physics_weight: float = 0.0,
     ):
         super().__init__()
         self.pos_weight = float(pos_weight)
         self.node_weight = float(node_weight)
         self.edge_weight = float(edge_weight)
+        self.edge_positive_weight = float(edge_positive_weight)
         self.physics_weight = float(physics_weight)
 
     def forward(
@@ -47,6 +64,7 @@ class MixedStateConsistencyLoss(nn.Module):
         mask_pos: Optional[torch.Tensor] = None,
         mask_node: Optional[torch.Tensor] = None,
         mask_edge: Optional[torch.Tensor] = None,
+        edge_target_type: Optional[torch.Tensor] = None,
     ) -> Dict[str, torch.Tensor]:
         pos_loss_all = F.mse_loss(
             student_pred_x0["pred_pos_x0"],
@@ -63,7 +81,15 @@ class MixedStateConsistencyLoss(nn.Module):
         edge_log_prob = F.log_softmax(student_pred_x0["pred_halfedge_logits_x0"], dim=-1)
         edge_target_prob = F.softmax(ema_pred_x0["pred_halfedge_logits_x0"].detach(), dim=-1)
         edge_kl_all = F.kl_div(edge_log_prob, edge_target_prob, reduction="none").sum(dim=-1)
-        edge_loss = _masked_mean(edge_kl_all, mask_edge)
+        edge_weights = None
+        if edge_target_type is not None and self.edge_positive_weight != 1.0:
+            edge_weights = torch.ones_like(edge_kl_all)
+            edge_weights = torch.where(
+                edge_target_type > 0,
+                edge_weights.new_full(edge_weights.shape, self.edge_positive_weight),
+                edge_weights,
+            )
+        edge_loss = _weighted_masked_mean(edge_kl_all, mask_edge, edge_weights)
 
         physics_loss = compute_joint_physics_loss(
             student_pred_x0["pred_pos_x0"],
@@ -82,4 +108,3 @@ class MixedStateConsistencyLoss(nn.Module):
             "physics": physics_loss,
             "total": total,
         }
-

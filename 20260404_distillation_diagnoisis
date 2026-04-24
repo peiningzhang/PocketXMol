@@ -1,0 +1,412 @@
+# PocketXMol Consistency Distillation — 根因诊断
+
+## 一句话结论
+
+> **蒸馏模型的根本问题不是过拟合，而是 Teacher 的原始范式与 Consistency Model 框架之间存在多层根本性不兼容，导致 Student 学到的是一个"打了折扣的近似一致性"，而非真正的轨迹一致性。**
+
+---
+
+## 现状快照
+
+| 指标 | Baseline (100-step diffusion) | Distilled VE (100-step) | Delta |
+|---|---:|---:|---:|
+| `recon_success` | 0.9517 | 0.6490 | **-0.3027** |
+| `complete` | 0.9404 | 0.5870 | **-0.3534** |
+| `no_clashes` | 0.9445 | 0.7720 | -0.1725 |
+| `stereo` | 0.2509 | 0.1252 | -0.1257 |
+| `atom_type_js` | 0.0781 | 0.0895 | +0.0113 |
+| `jsd_6_6_1` (bond) | 0.3334 | 0.6692 | **+0.3358** |
+| `jsd_all_12a` (pair) | 0.0863 | 0.2705 | **+0.1842** |
+
+即使给到 100 步——与 baseline 相同的步数预算——蒸馏模型仍然在 reconstruction、completeness、几何分布上全面落后。**这说明问题不在采样步数太少，而在蒸馏本身的学习质量。**
+
+---
+
+## 问题分层诊断
+
+### 🔴 1. Teacher 没有显式 noise-level conditioning（最根本的矛盾）
+
+```
+核心矛盾：Consistency Model 要求模型是 f(x_t, t) 的函数，
+但 PocketXMol 的 PMAsymDenoiser 完全不接收 t / σ 作为输入。
+```
+
+**细节分析**：
+
+- `PMAsymDenoiser.forward(batch)` 的输入只有 `pos_in`, `node_in`, `halfedge_in` 加上 pocket context（参见 [maskfill.py:L99-201](file:///shared/healthinfolab/phz24002/PocketXMol/models/maskfill.py#L99-L201)）
+- 模型**没有 timestep embedding**，也没有 `sigma` / `noise-level` 的任何输入通道
+- Teacher 之所以"能工作"，是因为它在原始扩散采样中总是从 `level=0`（纯噪声）逐步走到 `level=1`（干净）——模型隐式地通过输入的噪声幅度来推断"自己处于去噪轨迹的哪个位置"
+
+**对 Consistency Distillation 的影响**：
+
+Consistency Distillation 要求 `f_θ(x_{t_{n+1}}, t_{n+1}) ≈ f_{θ⁻}(x̂_{t_n}, t_n)`。但由于模型不知道自己在哪个 `t`：
+
+- Student 在 `t_high` 看到的是高噪声输入，模型必须仅凭噪声幅度来猜测 t
+- EMA Student 在 `t_low` 看到的是稍低噪声的输入
+- **两者之间的"t 差异"完全靠输入统计量的微弱差异来传递**，而不是通过一个明确的 conditioning signal
+
+这意味着模型需要极其精细地从输入 magnitude 中提取 noise-level 信息来实现一致性映射，但这在以下情况下会彻底失效：
+- 噪声尺度很小（分不清 `σ = 0.01` 和 `σ = 0.05`）
+- 噪声尺度已经饱和（分不清 `σ = 60` 和 `σ = 80`）
+- 连续和离散部分的 noise level 不同步时
+
+> [!CAUTION]
+> 这是最致命的问题。标准 Consistency Model 论文（Song et al.）的所有理论保证都建立在 `f(x, t)` 对 `t` 有显式 conditioning 的前提上。没有 timestep conditioning 的模型做 consistency distillation，本质上是在用一个 **"不知道自己处于轨迹什么位置"的模型** 去强制学习轨迹一致性，这在理论上就不完整。
+
+---
+
+### 🔴 2. SNR 缩放是经验性近似，不是严格等价
+
+当前的解决方案是用 SNR 对齐把 VE 状态映射回 VP 形式：
+
+```python
+scale(σ) = 1 / sqrt(1 + σ²)
+pos_in = pos_state * scale(σ)
+```
+
+这在数学上等价于：
+
+```
+x_in = x_t / sqrt(1 + σ²) = sqrt(α̅) * x_0 + sqrt(1 - α̅) * ε
+```
+
+**问题**：
+
+1. **这个变换是对的，但 Teacher 训练时不是这么做的。** Teacher 训练时使用 `info_level ∈ [0, 1]` 参数化噪声，公式是：
+   ```python
+   pert = x_0 + (1 - info_level) * noise    # where noise ~ N(0, σ_max²I)
+   ```
+   这相当于 `σ_effective = (1 - info_level) * σ_max`。Teacher 看到的尺度范围是 `[0, σ_max]`（通常 `σ_max ~ 5-10`），而不是 VE schedule 的 `[0.002, 80]`。
+
+2. **SNR 缩放后的输入尺度可能超出 Teacher 训练分布。** 当 `σ = 80` 时，`scale = 1/sqrt(6401) ≈ 0.0125`，输入坐标被压缩到几乎为零。Teacher 在训练时从未见过如此小尺度的输入。
+
+3. **缩放改变了输入的统计分布形状。** 即使尺度对齐了，VE 状态经过 SNR 缩放后的梯度特性与 VP 状态并不完全相同，因为 VP 的 `sqrt(α̅)` 对信号的衰减曲线与 VE+rescale 的曲线在非线性网络中的响应可能不同。
+
+---
+
+### 🟡 3. 连续 ↔ 离散 noise schedule 的深层不协调
+
+```
+位置分支：取决于 σ（VE sigma schedule）
+离散分支：取决于 β = sigmas_to_betas(σ)
+  其中 β 是从 σ 通过 α_bar = 1/(1+σ²) 关系导出的
+```
+
+**问题分析**：
+
+Teacher 原始训练中，连续和离散的噪声是通过**同一个 `info_level` 标量**同步控制的：
+```python
+# Prior.add_noise 中
+level_node ≈ level_pos ≈ level_edge  (由 MolInfoLevel 统一采样)
+```
+
+但在 Consistency Distillation 中：
+- 连续位置取 `σ_t` → VE 加噪 → SNR 缩放
+- 离散类型取 `β_t = 1 - α_bar_t/α_bar_{t-1}` → categorical transition
+
+这两个 schedule 虽然数学上"由同一个 σ 导出"，但它们**在实际训练中对应的 corruption 强度并不线性对齐**：
+
+| `σ` | `α_bar` | 位置 SNR | 离散 `β` (近似) | 含义 |
+|-----|---------|---------|------|------|
+| 0.002 | ≈1.0 | 极高 | ≈0 | 几乎干净 |
+| 1.0 | 0.5 | 1:1 | 中等 | 半噪声 |
+| 10 | 0.01 | 极低 | 接近 1 | 几乎纯噪声 |
+| 80 | 0.00016 | 极低 | 接近 1 | 完全噪声 |
+
+在 `σ > 5` 时，对离散分支来说 `β` 已经接近饱和（≈1），但对连续分支来说还有很大的动态范围。这导致：
+
+- **高噪声区：离散类型几乎全部随机化，但位置仍有一些结构残留**
+- **Teacher 在这种"类型全乱但位置还没完全乱"的不对称状态下做预测，其输出质量未知**
+
+> [!WARNING]
+> **原始 Teacher 训练中，连续和离散的 corruption 是同步进行的。蒸馏中它们被不同的 schedule 拆开了，这可能导致 Teacher 在某些 σ 上给出的引导是"离散部分已经完全丢失信息但位置还能恢复"的非自然状态。**
+
+---
+
+### 🟡 4. Consistency Loss 的匹配目标可能本身就是低质量的
+
+当前的训练循环是：
+
+```
+1. 对干净数据加噪到 t_high → 得到 (pos_high, node_high, edge_high)
+2. Teacher 预测 x₀ → (pred_pos_x0, pred_node_x0, pred_edge_x0)
+3. VE rollback 得到 pos_low_hat；离散 posterior 得到 node_low_hat, edge_low_hat
+4. EMA Student 在 (pos_low_hat, node_low_hat, edge_low_hat) 上预测 → EMA target
+5. Student 在 (pos_high, node_high, edge_high) 上预测 → Student output
+6. Loss = MSE(Student_pos, EMA_pos) + KL(EMA_type, Student_type)
+```
+
+**问题链条**：
+
+- **Step 2 的 Teacher 预测质量不稳定**：由于 σ_max=80 + SNR 缩放的近似性，Teacher 在高噪声区的预测可能本身就很差。
+- **Step 3 的 VE rollback 是确定性插值**：`x_prev = r * x_t + (1-r) * x_recon`。如果 Teacher 的 `x_recon` 很差，rollback 后的状态也是错误的。
+- **Step 4 的 EMA target 基于错误的 rollback 状态预测**：垃圾进垃圾出。
+- **最终 Student 被训练去匹配一个可能很差的 EMA target**
+
+这形成了一个**误差传播链**：
+```
+Teacher 在极端 σ 下的近似输出
+  → rollback 放大误差
+    → EMA 看到错误输入
+      → Student 学到错误的一致性映射
+```
+
+---
+
+### 🟡 5. σ_max = 80 与 Teacher 的实际感受野严重不匹配
+
+从 `gaussian_simple` prior 的代码可以看出：
+
+```python
+# prior.py L277-278
+sigma_max = getattr(config, 'sigma_max', 1) 
+```
+
+Teacher 训练时的默认 `sigma_max` 大概是 **1 到 10 的量级**（取决于具体 task 配置），而蒸馏配置中用了 `sigma_max = 80`。
+
+即使有 SNR 缩放对齐，模型在 `σ=80` 时看到的是 `scale = 0.0125` 的极小坐标，而 Teacher 在训练中最大也只见过 `σ_max` 对应的噪声。这个 **80 倍的外推** 不可能被简单的线性缩放完美修复。
+
+> [!IMPORTANT]
+> 配置中的 `sigma_max = 80` 来自 Karras/EDM 论文的图像领域默认值。PocketXMol 的坐标空间尺度完全不同。应该将其改为与 Teacher 训练时 `sigma_max` 一致的值（大概在 1-10）。
+
+---
+
+### 🟢 6. 过拟合？——不是主要问题
+
+从以下证据排除过拟合：
+
+1. **atom_type_js 差距很小（0.0781 vs 0.0895）**：说明离散类型的学习没有崩溃
+2. **QED/SA 表现正常**：化学属性指标接近 baseline
+3. **随着训练步数增加（50k → 100k），32-step 质量仍在提升**：没有看到 overfitting 导致的性能回退
+4. **蒸馏 loss 在训练中持续下降**：模型仍在学习
+
+**结论**：模型不是过拟合了，而是它学到的 target 本身就是不精确的。
+
+---
+
+### 🟢 7. 采样方式选择？——`snr_renoise` 已是当前最优
+
+文档记录了 `snr_renoise` vs `euler` 的对比，`snr_renoise` + `categorical_transition` 已确认为最稳定配置。
+
+---
+
+## 问题优先级排序
+
+```mermaid
+graph TD
+    A["❶ 没有 timestep conditioning"] -->|根因| B["模型无法区分不同 noise level"]
+    B --> C["一致性映射在理论上就不完整"]
+    
+    D["❷ σ_max = 80 严重外推"] -->|加剧| E["Teacher 在高噪声区给出垃圾预测"]
+    E --> F["EMA target 质量差"]
+    F --> G["Student 学到错误的一致性"]
+    
+    H["❸ 连续/离散 schedule 不协调"] -->|次要| I["Teacher 在非自然状态下预测"]
+    
+    J["❹ SNR 缩放的近似误差"] -->|次要| K["输入分布偏移"]
+```
+
+---
+
+## 建议的下一步（按优先级）
+
+### P0: 确认 σ_max 与 Teacher 一致
+
+> 这是**最低成本、最高收益**的修复。
+
+- 查看 Teacher 训练配置中 SBDD 任务对应的 `sigma_max`
+- 将蒸馏配置的 `sigma_max` 设为与之一致的值
+- 这将大幅减少高噪声区的 Teacher 预测误差
+
+### P1: 添加显式 noise-level conditioning
+
+> 这是**最重要但工程量最大**的修复。
+
+两种可能方案：
+1. **轻量级：在 input 中拼接 σ 信息。** 在 `node_extra` 中增加一个 `log(σ)` 维度，让模型能显式感知当前 noise level。需要重新训练或 fine-tune Teacher。
+2. **中量级：添加 timestep embedding。** 类似 DDPM 的做法，增加一个 sinusoidal timestep embedding 注入到 transformer 中。
+
+> [!WARNING]
+> 方案 1 和 2 都需要修改 Teacher 的模型结构并至少做一轮短周期 fine-tune，否则新增的 conditioning 通道对预训练权重无意义。
+
+### P2: 缩小 σ 范围后重跑蒸馏
+
+- 使用 `σ_max ~ 1-5`（与 Teacher 对齐），`σ_min = 0.002`
+- 使用 `num_steps = 50`，Karras schedule（而非 log_uniform）
+- 训练 100k steps
+- 评估 100-step parity
+
+### P3: 探索"Teacher-free"的 Consistency Training (CT)
+
+鉴于 Teacher 的 paradigm 与 Consistency Model 存在根本不兼容，另一种方向是：
+- 不依赖 Teacher rollback，而是用 **Consistency Training** 模式（从数据直接构造一致性对）
+- 这避免了 Teacher 预测质量差的问题，但需要更多训练数据和更长的训练时间
+
+---
+
+## 总结
+
+| 假设 | 结论 | 证据 |
+|------|------|------|
+| 过拟合？ | ❌ 排除 | loss 持续降低，atom_type_js 差距小 |
+| 原模型 paradigm 不匹配？ | ✅ **主因** | 无 timestep conditioning，σ_max 外推，SNR 近似 |
+| 蒸馏 curriculum 不对？ | ⚠️ 次要 | σ_max=80 确实不合理，但即使修正了 σ_max，核心矛盾仍在 |
+| 采样步数太少？ | ❌ 排除 | 100-step 仍然大幅落后 baseline |
+| 连续/离散不匹配？ | ⚠️ 次要 | schedule 确实不协调，但不是主因 |
+| 采样方式不对？ | ❌ 排除 | snr_renoise 已是最优 |
+| **核心结论** | | **Teacher 缺乏 timestep conditioning + σ 范围严重外推 → 蒸馏 target 本身就不准确** |
+
+---
+
+## 2026-04-04 实施记录：对齐 Teacher 训练范式
+
+基于以上诊断，本次 session 完成了以下改动，目标是最大程度地把蒸馏框架对齐到 Teacher 的原始训练范式。
+
+---
+
+### 改动 1：对齐 σ_max + 切换 uniform schedule
+
+**背景**：诊断指出 `sigma_max=80` 比 Teacher 训练分布（`sigma_max≈1.0`）高出约 80 倍，SNR 缩放只是近似补救，根本问题是 Teacher 没见过这么极端的噪声。
+
+**修改文件**：`configs/distill/distill_pxm.yaml`
+
+```yaml
+# Before
+schedule: "log_uniform"
+karras:
+  sigma_min: 0.002
+  sigma_max: 80.0
+
+# After
+schedule: "uniform"   # σ 在 [0.01, 1.0] 均匀采样，覆盖 teacher 的实际训练范围
+karras:
+  sigma_min: 0.01
+  sigma_max: 1.0     # 与 Teacher gaussian_simple prior 的默认 sigma_max 对齐
+```
+
+**同时**：`utils/consistency.py` 新增 `schedule_type == "uniform"` 分支，使用 `torch.linspace(sigma_min, sigma_max, num_steps)`。
+
+---
+
+### 改动 2：废弃 SNR 近似；新增 `SigmaUniformCategoricalTransition`
+
+**背景**：旧的 `GeneralCategoricalTransition` 通过 `sigmas_to_betas(σ)` 从 VE sigma 折算成 VP beta，这是一个近似。同时，`get_pos_snr_scale`（`1/sqrt(1+σ²)` 缩放）把 VE 坐标压缩到 VP 尺度，但这改变了输入统计特性。
+
+**修改文件**：`models/transition.py`, `utils/consistency.py`, `scripts/train_consistency.py`, `scripts/eval_consistency.py`, `scripts/generate_consistency.py`
+
+新建 `SigmaUniformCategoricalTransition`，让离散扩散直接对齐 Teacher 的 categorical prior：
+
+```
+Teacher prior:  prob = info_level * one_hot(v₀) + (1-info_level) * (1/K)
+新的 distill:   q(v_t|v₀) = (1-σ) * delta(v_t=v₀) + σ/K   （σ 直接=mask_rate）
+对应关系:        info_level = 1 - σ
+```
+
+这样连续（VE sigma）和离散（mask rate）在 `σ ∈ [0,1]` 范围内具有统一的物理意义：`σ=0` 是干净状态，`σ=1` 是完全随机/最大噪声。
+
+同步删除了 `sigmas_to_betas`、`get_pos_snr_scale`（所有 3 个调用点），坐标直接以 `pos_in = pos_state` 传入 Teacher。
+
+**数学细节**：
+- 前向边缘分布：`q(v_t|v₀) = (1-σ_t)*δ(v_t=v₀) + σ_t/K`
+- 单步 transition：`γ_t = (σ_t - σ_{t-1}) / (1 - σ_{t-1})`，clamp 到 `[0,1]`
+- Posterior：`q(v_{t-1}|v_t, p₀) ∝ [(1-γ_t)*p_vt + γ_t/K] × [(1-σ_{t-1})*p₀ + σ_{t-1}/K]`
+
+---
+
+### 改动 3：添加显式 noise-level conditioning（log σ → node_extra）
+
+**背景**：诊断中的 P1 问题——PMAsymDenoiser 没有任何 timestep/sigma conditioning，Student 必须从输入的噪声幅度隐式猜测 σ，这在理论上就不完整。
+
+**改动思路**：轻量级方案——利用已有的 `addition_node_features` 机制（zero-cost plugin，不改变模型整体结构）。只对 Student/EMA 模型注入 log σ，Teacher 保持不变。
+
+**修改文件**：`models/maskfill.py`, `utils/consistency.py`, 三个脚本
+
+**核心代码**（`models/maskfill.py`）：
+
+```python
+if 'log_sigma' in self.addition_node_features:
+    log_sigma = batch['log_sigma'].unsqueeze(-1).to(pos_in.dtype)
+    h_node_in = torch.cat([h_node_in, log_sigma], dim=-1)
+```
+
+**辅助函数**（`utils/consistency.py`）：
+
+```python
+def inject_log_sigma(batch, transitions, t_graph, node_batch, eps=1e-6):
+    """每次 forward 前调用，将 per-atom log(σ_t) 写入 batch['log_sigma']。"""
+    sigma = transitions["sigmas"].index_select(0, t_graph).index_select(0, node_batch)
+    batch["log_sigma"] = torch.log(sigma.clamp(min=eps))
+
+def add_log_sigma_to_model_config(model_cfg):
+    """返回添加了 'log_sigma' 到 addition_node_features 的 model config 副本。
+    用于构建 Student/EMA，Teacher 不变。"""
+```
+
+**权重初始化兼容性**：`node_emb_dim` 因新增一维而减少 1（从 `node_dim-2` 变为 `node_dim-3`）。从 Teacher 初始化 Student 时，通过截断 `nodetype_embedder.weight[:, :-1]` 实现 warm-start：
+
+```python
+student_sd["nodetype_embedder.weight"] = teacher_sd["nodetype_embedder.weight"][:, :-1]
+```
+
+**调用位置**：
+
+| 时机 | t_graph | 说明 |
+|------|---------|------|
+| EMA forward 前 | `t_low_graph` | EMA 看到的是 rollback 后的低噪声状态 |
+| Student forward 前 | `t_high_graph` | Student 看到的是原始高噪声状态 |
+| Sampling loop 每步 | `t_cur_graph` | 推理时每步注入当前 σ 的 log |
+
+---
+
+### 改动 4：坐标 cosine preconditioning
+
+**背景**：Consistency Model 的经典理论（Karras et al. EDM, Song et al. CM）都建议引入 `c_skip/c_out` preconditioning 来稳定训练，尤其是在低噪声区（让 Student 保守地 pass-through 输入）。
+
+**公式**（仅作用于坐标，离散特征不变）：
+
+```
+pred_pos_x0 = cos(σ·π/2) · pos_in  +  sin(σ·π/2) · net_out
+```
+
+| σ | cos (c_skip) | sin (c_out) | 效果 |
+|---|-------------|-------------|------|
+| sigma_min ≈ 0.01 | ≈ 1.000 | ≈ 0.016 | 几乎纯 skip-through |
+| 0.5 | ≈ 0.707 | ≈ 0.707 | 1:1 混合 |
+| sigma_max = 1.0 | = 0.000 | = 1.000 | 完全信任网络 |
+
+性质：`cos²(σπ/2) + sin²(σπ/2) = 1`，混合系数始终在单位圆上，输出尺度稳定。
+
+**修改文件**：`utils/consistency.py`（新增 `apply_cosine_pos_preconditioning`），三个脚本中各调用处。
+
+**调用位置**（5 处，紧跟 `normalize_pred_x0` 之后）：
+
+```python
+# train_consistency.py — teacher
+teacher_pred = apply_cosine_pos_preconditioning(teacher_pred, pos_high, transitions, t_high_graph, node_batch)
+# train_consistency.py — EMA
+ema_pred = apply_cosine_pos_preconditioning(ema_pred, pos_low_hat, transitions, t_low_graph, node_batch)
+# train_consistency.py — Student
+student_pred = apply_cosine_pos_preconditioning(student_pred, pos_high, transitions, t_high_graph, node_batch)
+# eval/generate_consistency.py — sampling loop
+pred_x0 = apply_cosine_pos_preconditioning(pred_x0, pos_state, transitions, t_cur_graph, node_batch)
+```
+
+注意 Teacher 也应用了 preconditioning，这改善了 rollback 目标的质量（低噪声区保守，高噪声区信任网络）。
+
+---
+
+### 改动汇总
+
+| 问题 | 改动 | 文件 | 状态 |
+|------|------|------|------|
+| P0：σ_max 远超 Teacher 分布 | `sigma_max: 80→1.0`, schedule: `log_uniform→uniform` | `distill_pxm.yaml`, `consistency.py` | ✅ done |
+| P0：SNR 缩放是近似 | 删除 `get_pos_snr_scale`，直接 `pos_in=pos_state` | 5 个文件 | ✅ done |
+| 连续/离散 schedule 不协调 | 新建 `SigmaUniformCategoricalTransition`，σ 直接作 mask_rate | `transition.py`, `consistency.py` | ✅ done |
+| P1：无 noise-level conditioning | `log(σ)` 拼接到 node_extra，injection + weight truncation | `maskfill.py`, 3 个脚本 | ✅ done |
+| 低噪声区训练不稳定 | cosine preconditioning（5 处调用） | `consistency.py`, 3 个脚本 | ✅ done |
+
+### 待观察
+
+- Student 从 Teacher warm-start 后，`nodetype_embedder` 最后一列被截断，前几步 loss 可能略高于之前
+- log σ channel 初始权重为 0（`linear` projector 的零初始化），需要约 1-5k steps 才能学到有意义的 conditioning
+- cosine skip 在 `σ_min=0.01` 时 `c_skip ≈ 1`，实际等同于"直接输出输入"——如果 Teacher 在这个区间本来就做得好，一致性 loss 会很小，Student 收敛快

@@ -8,31 +8,19 @@ distill:
   task_name: "sbdd"
   data_override:
     root: "./data_train"
-    assembly_path: "assemblies/split_csd.lmdb" # assembly_path: "assemblies/split_reduced_assembly.lmdb"
+    assembly_path: "assemblies/split_csd.lmdb"
     db_ratio:
       csd: 1.0
-  # Optional: override teacher train data path for current machine.
-  # data_override:
-  #   root: "/shared/healthinfolab/phz24002/PocketXMol/data"
-  #   assembly_path: "assemblies/cls30.lmdb"   # script will use cls30_train.lmdb
-  #   # Optional: override db ratio for the selected task only
-  #   # db_ratio:
-  #   #   csd: 1.0
-  #   # Optional: provide full dataset block (advanced)
-  #   # dataset:
-  #   #   root: "/path/to/data"
-  #   #   assembly_path: "assemblies/xxx.lmdb"
-  #   #   dbs: [...]
 
   # Karras schedule (rho=7) or log_uniform
   num_steps: 50
-  schedule: "uniform"  # "karras" or "log_uniform"
+  schedule: "uniform"
   karras:
     sigma_min: 0.01
     sigma_max: 1.0
     rho: 7.0
   sampling:
-    coordinate_update: snr_renoise
+    coordinate_update: euler
     discrete_update: categorical_transition
     campbell_sigma_data: 1.0
     campbell_stochasticity: 2.0
@@ -55,7 +43,6 @@ distill:
   train:
     seed: 2026
     batch_size: 8
-    # Safe defaults for many shared servers; increase only if /dev/shm is sufficient.
     num_workers: 4
     pin_memory: false
     persistent_workers: false
@@ -70,10 +57,8 @@ distill:
     project: "pocketxmol-consistency"
     name: "sbdd-distill-run1"
     entity: ""
-    id: ""                  # optional fixed run id
-    resume: "allow" # allow | must | never
-
-
+    id: ""
+    resume: "allow"
 
   online_eval:
     enabled: true
@@ -82,5 +67,4 @@ distill:
     num_mols: 100
     outdir: "outputs_consistency_online_eval"
 
-  # Optional default ckpt for eval script
   eval_checkpoint: ""

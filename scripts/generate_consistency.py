@@ -22,10 +22,12 @@ from utils.consistency import (
     get_task_noise_cfg,
     get_sampling_update_modes,
     infer_train_config_path_from_ckpt,
-    get_pos_snr_scale,
     normalize_pred_x0,
     renoise_from_pred_x0,
     sample_prior_states,
+    inject_log_sigma,
+    add_log_sigma_to_model_config,
+    apply_cosine_pos_preconditioning,
 )
 from utils.dataset import TestTaskDataset
 from utils.misc import get_logger, get_new_log_dir, make_config, save_config, seed_all
@@ -130,10 +132,14 @@ def _consistency_sample_batch(
         )
         input_batch = copy.copy(batch)
         input_batch["node_in"] = node_state
-        input_batch["pos_in"] = pos_state * get_pos_snr_scale(transitions, t_cur_graph, node_batch)
+        input_batch["pos_in"] = pos_state
         input_batch["halfedge_in"] = edge_state
+        inject_log_sigma(input_batch, transitions, t_cur_graph, node_batch)
         outputs = model(input_batch)
         pred_x0 = normalize_pred_x0(outputs)
+        pred_x0 = apply_cosine_pos_preconditioning(
+            pred_x0, pos_state, transitions, t_cur_graph, node_batch
+        )
 
         if i == len(schedule) - 1:
             node_state = pred_x0["pred_node_logits_x0"].argmax(dim=-1)
@@ -254,7 +260,8 @@ def main():
         max_repeats = configured_repeats if configured_repeats > 0 else int(1e9)
 
     device = torch.device(args.device)
-    model = PMAsymDenoiser(config=teacher_train_cfg.model, **in_dims).to(device)
+    student_model_cfg = add_log_sigma_to_model_config(teacher_train_cfg.model)
+    model = PMAsymDenoiser(config=student_model_cfg, **in_dims).to(device)
     _load_student(model, ckpt_path, use_ema=args.use_ema, map_location=device)
     model.eval()
 

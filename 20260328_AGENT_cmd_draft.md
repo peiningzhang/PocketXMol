@@ -239,8 +239,7 @@ CUDA_VISIBLE_DEVICES=1 python scripts/sample_drug3d.py --config_task configs/sam
 
 ```
 (pxm_vina) [phz24002@gpu39 PocketXMol]$ python evaluate/evaluate_vina_sdf.py   --sdf_dir outputs_test/sbdd_csd_noAR/simple_pxm_20260311_150536/SDF/   --gen_info outputs_test/sbdd_csd_noAR/simple_pxm_20260311_150536/gen_info.csv   
---split_by_name_path /shared/healthinfolab/phz24002/AliDiff/data/split_by_name.pt   --test_set_root /shared/healthi
-nfolab/phz24002/AliDiff/data/test_set   --mode score_only   --n_workers 16   --quiet
+--split_by_name_path /shared/healthinfolab/phz24002/AliDiff/data/split_by_name.pt   --test_set_root /shared/healthinfolab/phz24002/AliDiff/data/test_set   --mode score_only   --n_workers 16   --quiet
 ---
 Saved 10000 results to outputs_test/sbdd_csd_noAR/simple_pxm_20260311_150536/vina.csv
   vina_score mean: -5.76

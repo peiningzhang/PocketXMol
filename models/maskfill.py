@@ -115,6 +115,9 @@ class PMAsymDenoiser(Module):
                 - pocket_pos: Pocket coordinates [N_pocket_atoms, 3]
                 - pocket_knn_edge_index: Pocket connectivity [2, N_pocket_edges]
                 - is_peptide: composing amino acids or not [N_atoms]
+                - log_sigma (optional): per-atom log(sigma_t) [N_atoms]. Present when
+                  'log_sigma' is in config.addition_node_features; provides explicit
+                  noise-level conditioning for consistency distillation.
                 - node_type_batch, pocket_pos_batch: Batch indices for graph pooling
                 
         Returns:
@@ -148,6 +151,12 @@ class PMAsymDenoiser(Module):
         if 'is_peptide' in self.addition_node_features:
             is_peptide = batch['is_peptide'].unsqueeze(-1).to(pos_in.dtype)
             h_node_in = torch.cat([h_node_in, is_peptide], dim=-1)
+        
+        if 'log_sigma' in self.addition_node_features:
+            # log(sigma_t) is a scalar per atom; inject as a 1-D channel so the
+            # model can distinguish different noise levels along the trajectory.
+            log_sigma = batch['log_sigma'].unsqueeze(-1).to(pos_in.dtype)
+            h_node_in = torch.cat([h_node_in, log_sigma], dim=-1)
         
         # Step 2: Encode protein pocket as context
         h_pocket = self.pocket_embedder(batch['pocket_atom_feature'])

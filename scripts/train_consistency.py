@@ -30,8 +30,10 @@ from utils.consistency import (
     get_task_noise_cfg,
     infer_train_config_path_from_ckpt,
     normalize_pred_x0,
-    get_pos_snr_scale,
     to_plain_dict,
+    inject_log_sigma,
+    add_log_sigma_to_model_config,
+    apply_cosine_pos_preconditioning,
 )
 from utils.dataset import ForeverTaskDataset
 from utils.misc import get_logger, get_new_log_dir, make_config, save_config, seed_all
@@ -320,7 +322,6 @@ def _save_distill_ckpt(path, step, student, ema_student, optimizer, config, tran
         "optimizer": optimizer.state_dict(),
         "config": to_plain_dict(config),
         "sigmas": transitions["sigmas"].detach().cpu(),
-        "betas": transitions["betas"].detach().cpu(),
         "wandb": wandb_meta,
         "saved_at": datetime.now().isoformat(),
     }
@@ -427,10 +428,39 @@ def main():
     for p in teacher.parameters():
         p.requires_grad_(False)
 
-    student = PMAsymDenoiser(config=teacher_train_cfg.model, **in_dims).to(device)
+    # Student / EMA get an extended config that adds 'log_sigma' to
+    # addition_node_features.  This reduces node_emb_dim by 1; when
+    # initialising from the teacher we truncate the last column of
+    # nodetype_embedder.weight so the rest of the weights are reused exactly.
+    student_model_cfg = add_log_sigma_to_model_config(teacher_train_cfg.model)
+    student = PMAsymDenoiser(config=student_model_cfg, **in_dims).to(device)
     init_from = getattr(distill_cfg, "student_init", "teacher")
     if init_from == "teacher":
-        _load_model_checkpoint(student, teacher_ckpt, map_location=device)
+        # Load teacher weights; handle the 1-dim reduction in nodetype_embedder.
+        teacher_sd = {k: v for k, v in teacher.state_dict().items()}
+        student_sd = student.state_dict()
+        for key in student_sd:
+            if key not in teacher_sd:
+                logger.warning("Key %s not in teacher; keeping random init.", key)
+                continue
+            t_shape = teacher_sd[key].shape
+            s_shape = student_sd[key].shape
+            if t_shape == s_shape:
+                student_sd[key] = teacher_sd[key]
+            elif key == "nodetype_embedder.weight" and t_shape[0] == s_shape[0] and t_shape[1] == s_shape[1] + 1:
+                # Teacher emb: (K, node_emb_dim+1); Student emb: (K, node_emb_dim).
+                # Drop the last embedding dimension (least impactful warm-start).
+                student_sd[key] = teacher_sd[key][:, :-1].contiguous()
+                logger.info(
+                    "Truncated nodetype_embedder.weight from %s to %s for log_sigma conditioning.",
+                    list(t_shape), list(s_shape),
+                )
+            else:
+                logger.warning(
+                    "Shape mismatch for %s: teacher=%s student=%s — keeping random init.",
+                    key, list(t_shape), list(s_shape),
+                )
+        student.load_state_dict(student_sd, strict=True)
     elif init_from == "checkpoint":
         _load_model_checkpoint(student, distill_cfg.student_checkpoint, map_location=device)
     elif init_from == "random":
@@ -473,6 +503,7 @@ def main():
         pos_weight=float(distill_cfg.loss_weights.pos),
         node_weight=float(distill_cfg.loss_weights.node),
         edge_weight=float(distill_cfg.loss_weights.halfedge),
+        edge_positive_weight=float(getattr(distill_cfg.loss_weights, "edge_positive", 1.0)),
         physics_weight=float(getattr(distill_cfg.loss_weights, "physics", 0.0)),
     )
 
@@ -548,15 +579,19 @@ def main():
                 node_high, log_node_high, _ = transitions["node"].add_noise(batch["node_type"], t_high_graph, batch=node_batch)
                 edge_high, log_edge_high, _ = transitions["edge"].add_noise(batch["halfedge_type"], t_high_graph, batch=edge_batch)
                 pos_high = transitions["pos"].add_noise(batch["node_pos"], t_high_graph, batch=node_batch)
-                pos_high_in = pos_high * get_pos_snr_scale(transitions, t_high_graph, node_batch)
+                pos_high_in = pos_high
 
                 teacher_batch = copy.copy(batch)
                 teacher_batch["node_in"] = node_high
                 teacher_batch["halfedge_in"] = edge_high
                 teacher_batch["pos_in"] = pos_high_in
+                # Teacher does NOT use log_sigma (no addition_node_features change).
 
                 with torch.no_grad():
                     teacher_pred = normalize_pred_x0(teacher(teacher_batch))
+                    teacher_pred = apply_cosine_pos_preconditioning(
+                        teacher_pred, pos_high, transitions, t_high_graph, node_batch
+                    )
                     teacher_log_node_x0 = F.log_softmax(teacher_pred["pred_node_logits_x0"], dim=-1)
                     teacher_log_edge_x0 = F.log_softmax(teacher_pred["pred_halfedge_logits_x0"], dim=-1)
 
@@ -583,18 +618,26 @@ def main():
                     )
                     edge_low_hat = log_sample_categorical(log_edge_low)
 
-                    pos_low_in = pos_low_hat * get_pos_snr_scale(transitions, t_low_graph, node_batch)
+                    pos_low_in = pos_low_hat
                     ema_batch = copy.copy(batch)
                     ema_batch["node_in"] = node_low_hat
                     ema_batch["halfedge_in"] = edge_low_hat
                     ema_batch["pos_in"] = pos_low_in
+                    inject_log_sigma(ema_batch, transitions, t_low_graph, node_batch)
                     ema_pred = normalize_pred_x0(ema_student(ema_batch))
+                    ema_pred = apply_cosine_pos_preconditioning(
+                        ema_pred, pos_low_hat, transitions, t_low_graph, node_batch
+                    )
 
                 student_batch = copy.copy(batch)
                 student_batch["node_in"] = node_high
                 student_batch["halfedge_in"] = edge_high
                 student_batch["pos_in"] = pos_high_in
+                inject_log_sigma(student_batch, transitions, t_high_graph, node_batch)
                 student_pred = normalize_pred_x0(student(student_batch))
+                student_pred = apply_cosine_pos_preconditioning(
+                    student_pred, pos_high, transitions, t_high_graph, node_batch
+                )
 
                 loss_dict = loss_fn(
                     student_pred_x0=student_pred,
@@ -602,6 +645,7 @@ def main():
                     mask_pos=(batch["fixed_pos"] == 0),
                     mask_node=(batch["fixed_node"] == 0),
                     mask_edge=(batch["fixed_halfedge"] == 0),
+                    edge_target_type=batch["halfedge_type"],
                 )
                 loss = loss_dict["total"]
 

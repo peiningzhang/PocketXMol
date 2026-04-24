@@ -52,6 +52,133 @@ class ContigousTransition(nn.Module):
             return torch.randn([shape, self.num_classes]).to(self.sigmas.device)
 
 
+class SigmaUniformCategoricalTransition(nn.Module):
+    """Categorical diffusion where sigma_t is *directly* the corruption / mask rate.
+
+    Forward marginal:
+        q(v_t | v_0) = (1 - sigma_t) * delta(v_t = v_0) + sigma_t / K
+
+    This exactly mirrors the teacher's CategoricalPrior with prior_type="uniform":
+        prob = info_level * one_hot(v_0) + (1 - info_level) * (1/K)
+    using the correspondence  info_level = 1 - sigma_t.
+
+    One-step forward transition (needed for posterior):
+        q(v_t | v_{t-1}) = (1 - gamma_t) * delta(v_t = v_{t-1}) + gamma_t / K
+        where gamma_t = (sigma_t - sigma_{t-1}) / (1 - sigma_{t-1})  [clipped to [0,1]]
+
+    Posterior:
+        q(v_{t-1} | v_t, p_0) propto q(v_t | v_{t-1}) * q(v_{t-1} | p_0)
+        where both terms reduce to simple scalar combinations.
+    """
+
+    def __init__(self, sigmas, num_classes, init_prob=None):
+        super().__init__()
+        self.eps = 1e-30
+        self.num_classes = num_classes
+        sigmas = np.asarray(sigmas, dtype=np.float64)
+        if sigmas.ndim != 1:
+            raise ValueError("sigmas must be a 1D array.")
+        self.sigmas = to_torch_const(sigmas)
+
+        if init_prob is None:
+            init_prob_arr = np.ones(num_classes, dtype=np.float64) / num_classes
+        else:
+            init_prob_arr = np.asarray(init_prob, dtype=np.float64)
+            init_prob_arr = init_prob_arr / init_prob_arr.sum()
+        self.register_buffer("_init_prob_buf", torch.from_numpy(init_prob_arr).float())
+
+    # ------------------------------------------------------------------ helpers
+    def _sigma(self, t, batch=None):
+        """Return per-atom sigma, shape (N, 1)."""
+        s = self.sigmas.index_select(0, t)
+        if batch is not None:
+            s = s.index_select(0, batch)
+        return s.unsqueeze(-1)   # (N, 1)
+
+    def index_to_log_onehot(self, v):
+        return index_to_log_onehot(v, self.num_classes)
+
+    def onehot_encode(self, v):
+        return F.one_hot(v, self.num_classes).float()
+
+    # ------------------------------------------------------------------ forward marginal
+    def q_vt_pred(self, log_v0, t, batch=None):
+        """Log of q(v_t | v_0): (1-sigma)*p0 + sigma/K."""
+        if batch is None:
+            batch = torch.arange(t.shape[0], device=t.device)
+        sigma = self._sigma(t, batch)          # (N, 1)
+        p0 = log_v0.exp()                      # (N, K)
+        q = (1.0 - sigma) * p0 + sigma / self.num_classes
+        return torch.log(q + self.eps).clamp_min(-32.0)
+
+    def q_vt_sample(self, log_v0, t, batch=None):
+        """Sample from q(v_t | v_0)."""
+        if batch is None:
+            batch = torch.arange(t.shape[0], device=t.device)
+        log_q = self.q_vt_pred(log_v0, t, batch)
+        sample = log_sample_categorical(log_q)
+        log_sample = index_to_log_onehot(sample, self.num_classes)
+        return sample, log_sample
+
+    def add_noise(self, v, time_step, batch=None):
+        """Add noise: returns (v_perturbed, log_vt, log_v0)."""
+        if batch is None:
+            batch = torch.arange(time_step.shape[0], device=time_step.device)
+        log_v0 = index_to_log_onehot(v, self.num_classes)
+        v_perturbed, log_vt = self.q_vt_sample(log_v0, time_step, batch)
+        v_perturbed = torch.where(time_step[batch] == 0, v, v_perturbed)
+        log_vt = torch.where(time_step[batch, None] == 0, log_v0, log_vt)
+        return v_perturbed, log_vt, log_v0
+
+    # ------------------------------------------------------------------ posterior
+    def q_v_posterior(self, log_v0, log_vt, t, batch=None, v0_prob=True):
+        """
+        Compute log q(v_{t-1} | v_t, p_0) for one rollback step.
+
+        Derivation (using uniform mixing):
+          fact1[k] = q(v_t | v_{t-1}=k)  *  p(v_t observed)  [unnorm]
+                   = (1 - gamma_t) * p_vt(k) + gamma_t / K
+          fact2[k] = q(v_{t-1}=k | p_0)
+                   = (1 - sigma_{t-1}) * p_0(k) + sigma_{t-1} / K
+          posterior[k] propto fact1[k] * fact2[k]
+        """
+        if batch is None:
+            batch = torch.arange(t.shape[0], device=t.device)
+
+        t_prev = torch.clamp(t - 1, min=0)
+        sigma_t    = self._sigma(t,      batch)   # (N, 1)
+        sigma_prev = self._sigma(t_prev, batch)   # (N, 1)
+
+        # gamma_t = (sigma_t - sigma_prev) / (1 - sigma_prev)
+        gamma_t = ((sigma_t - sigma_prev) / (1.0 - sigma_prev + 1e-12)).clamp(0.0, 1.0)
+
+        p_vt = log_vt.exp()   # (N, K)
+        p0   = log_v0.exp()   # (N, K)
+
+        # fact1: q(v_t | v_{t-1}=k) integrated against observed v_t distribution
+        fact1 = (1.0 - gamma_t) * p_vt + gamma_t / self.num_classes   # (N, K)
+        # fact2: q(v_{t-1}=k | p_0)
+        fact2 = (1.0 - sigma_prev) * p0 + sigma_prev / self.num_classes  # (N, K)
+
+        out = torch.log(fact1 + self.eps) + torch.log(fact2 + self.eps)
+        out = out - torch.logsumexp(out, dim=-1, keepdim=True)
+
+        # At t=0, posterior collapses to p_0
+        t_expand = t[batch].unsqueeze(-1)
+        out = torch.where(t_expand == 0, log_v0, out)
+        return out
+
+    # ------------------------------------------------------------------ sampling prior
+    def sample_init(self, n):
+        """Sample from the noise prior (sigma_max state = fully uniform)."""
+        init_log = torch.log(self._init_prob_buf + self.eps).clamp_min(-32.0)
+        init_log = init_log.unsqueeze(0).expand(n, -1)
+        init_types  = log_sample_categorical(init_log)
+        init_onehot = self.onehot_encode(init_types)
+        log_vt = index_to_log_onehot(init_types, self.num_classes)
+        return init_types, init_onehot, log_vt
+
+
 class CategoricalTransition(nn.Module):
     def __init__(self, betas, num_classes):
         super().__init__()

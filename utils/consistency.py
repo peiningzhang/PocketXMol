@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from models.transition import ContigousTransition, GeneralCategoricalTransition
+from models.transition import ContigousTransition, GeneralCategoricalTransition, SigmaUniformCategoricalTransition
 
 
 def to_plain_dict(obj):
@@ -91,16 +91,6 @@ def log_uniform_sigmas(
     return sigmas_desc
 
 
-def sigmas_to_betas(sigmas_ascending: torch.Tensor) -> torch.Tensor:
-    # alpha_bar = 1 / (1 + sigma^2), with t=0 close to clean and t=T-1 noisy.
-    alpha_bar = 1.0 / (1.0 + sigmas_ascending ** 2)
-    alphas = torch.empty_like(alpha_bar)
-    alphas[0] = alpha_bar[0].clamp(min=1e-6, max=1.0)
-    alphas[1:] = (alpha_bar[1:] / alpha_bar[:-1]).clamp(min=1e-6, max=1.0)
-    betas = (1.0 - alphas).clamp(min=1e-6, max=0.999)
-    return betas
-
-
 def build_transitions(
     num_steps: int,
     sigma_min: float,
@@ -115,18 +105,27 @@ def build_transitions(
 ) -> Dict[str, object]:
     if schedule_type == "log_uniform":
         sigmas = log_uniform_sigmas(num_steps, sigma_min, sigma_max, device=device, ascending=True)
+    elif schedule_type == "uniform":
+        sigmas = torch.linspace(sigma_min, sigma_max, num_steps, device=device)
     else:
         sigmas = karras_sigmas(num_steps, sigma_min, sigma_max, rho=rho, device=device, ascending=True)
-    betas = sigmas_to_betas(sigmas).detach().cpu().numpy()
+
+    # sigmas are in [sigma_min, sigma_max].  For categorical diffusion we directly
+    # use sigma as the mask/corruption rate, clamped to [0, 1], so that it matches
+    # the teacher's CategoricalPrior:  prob = (1-sigma)*one_hot(v0) + sigma*uniform.
+    sigmas_np = sigmas.detach().cpu().numpy()
     node_init_prob = _prior_probs_from_cfg(node_prior_cfg, num_node_types)
     edge_init_prob = _prior_probs_from_cfg(edge_prior_cfg, num_edge_types)
 
     transitions = {
         "sigmas": sigmas,
-        "betas": torch.from_numpy(betas).to(sigmas.device),
-        "pos": ContigousTransition(sigmas.detach().cpu().numpy()).to(sigmas.device),
-        "node": GeneralCategoricalTransition(betas, num_node_types, init_prob=node_init_prob).to(sigmas.device),
-        "edge": GeneralCategoricalTransition(betas, num_edge_types, init_prob=edge_init_prob).to(sigmas.device),
+        "pos": ContigousTransition(sigmas_np).to(sigmas.device),
+        "node": SigmaUniformCategoricalTransition(
+            sigmas_np.clip(0.0, 1.0), num_node_types, init_prob=node_init_prob
+        ).to(sigmas.device),
+        "edge": SigmaUniformCategoricalTransition(
+            sigmas_np.clip(0.0, 1.0), num_edge_types, init_prob=edge_init_prob
+        ).to(sigmas.device),
     }
     return transitions
 
@@ -148,22 +147,88 @@ def get_sampling_update_modes(distill_cfg) -> Tuple[str, str]:
     return coordinate_update, discrete_update
 
 
-def get_pos_snr_scale(
-    transitions: Dict[str, object],
-    t_graph: torch.Tensor,
-    node_batch: torch.Tensor,
-) -> torch.Tensor:
-    # VE state is x = x0 + sigma * eps. Multiplying by 1 / sqrt(1 + sigma^2)
-    # maps it to the VP form sqrt(alpha_bar) * x0 + sqrt(1 - alpha_bar) * eps
-    # with alpha_bar = 1 / (1 + sigma^2), which matches the pretrained x0-prediction teacher.
-    sigmas = transitions["sigmas"].index_select(0, t_graph)
-    sigmas = sigmas.index_select(0, node_batch).unsqueeze(-1)
-    return torch.rsqrt(1.0 + sigmas * sigmas)
-
-
 def _gather_sigma(transitions: Dict[str, object], t_graph: torch.Tensor, batch_index: torch.Tensor) -> torch.Tensor:
     sigmas = transitions["sigmas"].index_select(0, t_graph)
     return sigmas.index_select(0, batch_index).unsqueeze(-1)
+
+
+def inject_log_sigma(
+    batch,
+    transitions: Dict[str, object],
+    t_graph: torch.Tensor,
+    node_batch: torch.Tensor,
+    eps: float = 1e-6,
+):
+    """Write per-atom log(sigma_t) into batch['log_sigma'] (in-place).
+
+    The model reads this value from node_extra when 'log_sigma' is in
+    model.config.addition_node_features, giving it explicit noise-level
+    conditioning without modifying the core denoiser architecture.
+    """
+    sigma = transitions["sigmas"].index_select(0, t_graph).index_select(0, node_batch)
+    batch["log_sigma"] = torch.log(sigma.clamp(min=eps))
+    return batch
+
+
+def add_log_sigma_to_model_config(model_cfg):
+    """Return a shallow-copy of model_cfg that adds 'log_sigma' to addition_node_features.
+
+    Used when building the student / EMA model so they receive noise-level info.
+    The teacher remains unchanged (it uses the average embedding, not the last dim).
+    """
+    import copy
+    cfg = copy.deepcopy(model_cfg)
+    feats = list(getattr(cfg, "addition_node_features", []))
+    if "log_sigma" not in feats:
+        feats.append("log_sigma")
+    cfg.addition_node_features = feats
+    return cfg
+
+
+def apply_cosine_pos_preconditioning(
+    pred_x0_dict: dict,
+    pos_in: torch.Tensor,
+    transitions: Dict[str, object],
+    t_graph: torch.Tensor,
+    node_batch: torch.Tensor,
+) -> dict:
+    """Apply cosine preconditioning to the coordinate prediction only.
+
+    Blends the network's raw position output with the noisy input:
+        pred_pos_x0 = cos(σ·π/2) · pos_in + sin(σ·π/2) · net_out
+
+    Properties:
+        σ = 0 (clean)     → pred = pos_in   (identity / pure skip)
+        σ = 1 (max noise) → pred = net_out  (trust the network)
+
+    This is a cosine instance of the EDM c_skip/c_out preconditioning.
+    Discrete node / edge features are NOT modified.
+
+    Args:
+        pred_x0_dict: dict returned by `normalize_pred_x0`, containing
+            'pred_pos_x0', 'pred_node_logits_x0', 'pred_halfedge_logits_x0'.
+        pos_in: noisy input coordinates used for this forward pass, shape (N, 3).
+        transitions: dict produced by `build_transitions`.
+        t_graph: integer timestep indices per graph, shape (B,).
+        node_batch: per-atom graph indices, shape (N,).
+
+    Returns:
+        A new dict with 'pred_pos_x0' replaced by the blended prediction.
+        All other keys are shallow-copied from pred_x0_dict.
+    """
+    sigma = transitions["sigmas"].index_select(0, t_graph).index_select(0, node_batch)
+    sigma = sigma.unsqueeze(-1)  # (N, 1)
+
+    angle = sigma * (torch.pi / 2.0)
+    alpha = torch.cos(angle)    # c_skip:  1→0 as σ goes 0→1
+    beta  = torch.sin(angle)    # c_out:   0→1 as σ goes 0→1
+
+    net_pos  = pred_x0_dict["pred_pos_x0"]           # (N, 3) raw network output
+    blended  = alpha * pos_in + beta * net_pos        # (N, 3)
+
+    result = dict(pred_x0_dict)
+    result["pred_pos_x0"] = blended
+    return result
 
 
 @torch.no_grad()

@@ -1,0 +1,68 @@
+distill:
+  teacher_checkpoint: "data/trained_models/pxm/checkpoints/pocketxmol.ckpt"
+  teacher_train_config: ""
+  student_init: "teacher"
+  student_checkpoint: ""
+  resume: ""
+  task_name: "sbdd"
+  data_override:
+    root: "./data_train"
+    assembly_path: "assemblies/split_csd.lmdb"
+    db_ratio:
+      csd: 1.0
+
+  num_steps: 50
+  schedule: "uniform"
+  karras:
+    sigma_min: 0.01
+    sigma_max: 1.0
+    rho: 7.0
+  sampling:
+    coordinate_update: euler
+    discrete_update: categorical_transition
+    campbell_sigma_data: 1.0
+    campbell_stochasticity: 2.0
+
+  loss_weights:
+    pos: 1.0
+    node: 1.0
+    halfedge: 1.0
+    edge_positive: 20.0
+    physics: 0.0
+
+  ema_decay: 0.999
+
+  optimization:
+    lr: 1.0e-5
+    weight_decay: 1.0e-4
+    beta1: 0.9
+    beta2: 0.999
+
+  train:
+    seed: 2026
+    batch_size: 8
+    num_workers: 4
+    pin_memory: false
+    persistent_workers: false
+    max_steps: 100000
+    grad_clip: 1.0
+    log_interval: 50
+    ckpt_interval: 1000
+    eval_interval: 10000
+
+  wandb:
+    enabled: false
+    project: "pocketxmol-consistency"
+    name: "sbdd-distill-edgepos20"
+    entity: ""
+    id: ""
+    resume: "allow"
+
+  online_eval:
+    enabled: false
+    config_task: "configs/sample/test/sbdd_csd/simple.yml"
+    sample_steps: [4]
+    num_mols: 100
+    outdir: "outputs_consistency_online_eval_edgepos20"
+
+  eval_checkpoint: ""
