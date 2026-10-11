@@ -24,13 +24,16 @@ from utils.consistency import (
     build_transitions,
     get_task_noise_cfg,
     get_sampling_update_modes,
+    get_model_pos_input,
+    get_position_input_mode,
+    get_pos_preconditioning_mode,
     infer_train_config_path_from_ckpt,
     normalize_pred_x0,
     renoise_from_pred_x0,
     sample_prior_states,
     inject_log_sigma,
     add_log_sigma_to_model_config,
-    apply_cosine_pos_preconditioning,
+    apply_pos_preconditioning,
 )
 from utils.dataset import TestTaskDataset
 from utils.misc import get_logger, get_new_log_dir, make_config, save_config, seed_all
@@ -120,6 +123,8 @@ def _consistency_sample_batch(
     coordinate_update,
     discrete_update,
     sampling_cfg,
+    position_input_mode,
+    pos_preconditioning_mode,
 ):
     node_state, pos_state, edge_state = sample_prior_states(batch, transitions, sigma_max=sigma_max)
     schedule = build_sampling_timestep_schedule(total_steps, sample_steps)
@@ -135,13 +140,25 @@ def _consistency_sample_batch(
         )
         input_batch = copy.copy(batch)
         input_batch["node_in"] = node_state
-        input_batch["pos_in"] = pos_state
+        pos_in = get_model_pos_input(
+            pos_state,
+            transitions,
+            t_cur_graph,
+            node_batch,
+            position_input_mode=position_input_mode,
+        )
+        input_batch["pos_in"] = pos_in
         input_batch["halfedge_in"] = edge_state
         inject_log_sigma(input_batch, transitions, t_cur_graph, node_batch)
         outputs = model(input_batch)
         pred_x0 = normalize_pred_x0(outputs)
-        pred_x0 = apply_cosine_pos_preconditioning(
-            pred_x0, pos_state, transitions, t_cur_graph, node_batch
+        pred_x0 = apply_pos_preconditioning(
+            pred_x0,
+            pos_in,
+            transitions,
+            t_cur_graph,
+            node_batch,
+            mode=pos_preconditioning_mode,
         )
 
         if i == len(schedule) - 1:
@@ -309,6 +326,8 @@ def main():
 
     task_noise_cfg = get_task_noise_cfg(teacher_train_cfg.noise, distill_cfg.task_name)
     coordinate_update, discrete_update = get_sampling_update_modes(distill_cfg)
+    position_input_mode = get_position_input_mode(distill_cfg)
+    pos_preconditioning_mode = get_pos_preconditioning_mode(distill_cfg)
     sampling_cfg = getattr(distill_cfg, "sampling", None)
     transitions = build_transitions(
         num_steps=int(distill_cfg.num_steps),
@@ -334,9 +353,11 @@ def main():
         float(distill_cfg.karras.sigma_max),
     )
     logger.info(
-        "Sampling update modes: coordinate=%s, discrete=%s",
+        "Sampling update modes: coordinate=%s, discrete=%s, position_input=%s, pos_preconditioning=%s",
         coordinate_update,
         discrete_update,
+        position_input_mode,
+        pos_preconditioning_mode,
     )
     save_config(distill_cfg_all, os.path.join(log_dir, "distill_config.yml"))
     save_config(task_cfg, os.path.join(log_dir, "task_config.yml"))
@@ -375,6 +396,8 @@ def main():
                     coordinate_update=coordinate_update,
                     discrete_update=discrete_update,
                     sampling_cfg=sampling_cfg,
+                    position_input_mode=position_input_mode,
+                    pos_preconditioning_mode=pos_preconditioning_mode,
                 )
                 rows, i_saved = _post_process_batch(batch, outputs, featurizer, sdf_dir, i_saved, logger)
                 all_rows.extend(rows)

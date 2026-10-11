@@ -876,3 +876,416 @@ Recommended next direction:
 - do not just increase edge-positive weight further
 - checkpoint selection matters: evaluate earlier checkpoints, especially `step_24000`, more seriously
 - next training change should combine edge-positive weighting with a geometry or valence/bond-distance regularizer, or cap positive-edge pressure
+
+## 2026-04-23 Teacher Input Diagnostic
+
+Tested whether restoring SNR-scaled coordinate input helps the frozen teacher's edge prediction directly.
+
+Added diagnostic:
+
+- [scripts/inspect_teacher_edge_inputs.py](/shared/healthinfolab/phz24002/PocketXMol/scripts/inspect_teacher_edge_inputs.py)
+
+Ran on:
+
+- teacher checkpoint:
+  `data/trained_models/pxm/checkpoints/pocketxmol.ckpt`
+- config:
+  [configs/distill/distill_pxm_euler_edgepos20.yaml](/shared/healthinfolab/phz24002/PocketXMol/configs/distill/distill_pxm_euler_edgepos20.yaml)
+- output:
+  [outputs_teacher_edge_input_diagnostics/teacher_raw_vs_snr_20260423_gpu35_gpu1/teacher_edge_input_diagnostic.csv](/shared/healthinfolab/phz24002/PocketXMol/outputs_teacher_edge_input_diagnostics/teacher_raw_vs_snr_20260423_gpu35_gpu1/teacher_edge_input_diagnostic.csv)
+
+Compared two teacher inputs on the same noised batches:
+
+- `position_input_mode = raw`
+- `position_input_mode = snr_scaled`
+
+Main result:
+
+- SNR-scaled input does **not** clearly rescue teacher edge prediction.
+- At low / mid noise, `raw` and `snr_scaled` are close.
+- At the noisiest tested step (`t=49`), `snr_scaled` is actually worse.
+
+Key numbers:
+
+| timestep | mode | pred positive frac | gt positive recall | gt positive precision |
+|---:|---|---:|---:|---:|
+| 25 | raw | 0.0752 | 0.7939 | 0.6550 |
+| 25 | snr_scaled | 0.0760 | 0.8136 | 0.6550 |
+| 49 | raw | 0.0256 | 0.1681 | 0.3989 |
+| 49 | snr_scaled | 0.0182 | 0.1128 | 0.4000 |
+
+Interpretation:
+
+- The earlier hypothesis "`pos_in` should be SNR-scaled because that will directly fix teacher edge targets" is not supported.
+- Any benefit from `snr_scaled` is more likely coming from student / EMA consistency dynamics, not from making the frozen teacher itself much better at edge prediction.
+
+## 2026-04-23 SNR-Input Controlled Retrain Started
+
+Started a controlled `4k`-step retrain to test whether `snr_scaled` position input helps multi-step sampling, even though it did not directly fix teacher edge prediction.
+
+Config:
+
+- [configs/distill/distill_pxm_euler_snrinput_edgepos20_4k.yaml](/shared/healthinfolab/phz24002/PocketXMol/configs/distill/distill_pxm_euler_snrinput_edgepos20_4k.yaml)
+
+Changes relative to the previous `edge_positive=20` setting:
+
+- `position_input_mode: raw -> snr_scaled`
+- kept:
+  - `pos_preconditioning = cosine`
+  - `edge_positive = 20`
+  - `coordinate_update = euler`
+  - `discrete_update = categorical_transition`
+
+Runtime:
+
+- host: `gpu35`
+- physical GPU: `GPU1`
+- output dir:
+  [outputs_distill_snrinput_edgepos20_4k/consistency_distill_20260423_233516](/shared/healthinfolab/phz24002/PocketXMol/outputs_distill_snrinput_edgepos20_4k/consistency_distill_20260423_233516)
+
+## 2026-04-24 SNR-Input + Cosine 4k Result
+
+The `snr_scaled + cosine + edge_positive=20` controlled run completed normally.
+
+Final checkpoint:
+
+- [outputs_distill_snrinput_edgepos20_4k/consistency_distill_20260423_233516/checkpoints/step_4000.pt](/shared/healthinfolab/phz24002/PocketXMol/outputs_distill_snrinput_edgepos20_4k/consistency_distill_20260423_233516/checkpoints/step_4000.pt)
+
+Edge diagnostic:
+
+- [outputs_edge_diagnostics/euler_snrinput_edgepos20_step4000_20260424_bs4/edge_diagnostic.csv](/shared/healthinfolab/phz24002/PocketXMol/outputs_edge_diagnostics/euler_snrinput_edgepos20_step4000_20260424_bs4/edge_diagnostic.csv)
+
+Small eval:
+
+- [outputs_consistency_eval_snrinput_edgepos20_step4000/consistency_eval_20260424_015313/summary.csv](/shared/healthinfolab/phz24002/PocketXMol/outputs_consistency_eval_snrinput_edgepos20_step4000/consistency_eval_20260424_015313/summary.csv)
+
+Edge fractions:
+
+| sample_steps | pred positive-bond frac |
+|---:|---:|
+| 1 | 0.0010 |
+| 8 | 0.0824 |
+| 100 | 0.0825 |
+
+Eval summary:
+
+| sample_steps | recon_success | complete | validity | connectivity |
+|---:|---:|---:|---:|---:|
+| 1 | 1.00 | 0.00 | 1.00 | 0.00 |
+| 8 | 0.62 | 0.20 | 0.62 | 0.3226 |
+| 100 | 0.89 | 0.26 | 0.89 | 0.2921 |
+
+Interpretation:
+
+- `snr_scaled` does not help `1-step`.
+- But it clearly improves multi-step behavior relative to the old `raw` edge-positive runs.
+- This suggests the main gain is in multi-step refinement, not in one-shot denoising.
+
+## 2026-04-24 No-Preconditioning Controlled Retrain Started
+
+Based on the poor `1-step` behavior and the observation that `snr_scaled` mainly helps multi-step refinement, started a second controlled `4k` run with cosine position preconditioning removed.
+
+Config:
+
+- [configs/distill/distill_pxm_euler_snrinput_noprecond_edgepos20_4k.yaml](/shared/healthinfolab/phz24002/PocketXMol/configs/distill/distill_pxm_euler_snrinput_noprecond_edgepos20_4k.yaml)
+
+Changes relative to the previous run:
+
+- keep `position_input_mode = snr_scaled`
+- change `pos_preconditioning: cosine -> none`
+- keep `edge_positive = 20`
+
+Runtime:
+
+- host: `gpu35`
+- physical GPU: `GPU1`
+- output dir:
+  [outputs_distill_snrinput_noprecond_edgepos20_4k/consistency_distill_20260424_105301](/shared/healthinfolab/phz24002/PocketXMol/outputs_distill_snrinput_noprecond_edgepos20_4k/consistency_distill_20260424_105301)
+
+## 2026-04-24 No-Preconditioning + EdgePos20 4k Result
+
+The `snr_scaled + no_preconditioning + edge_positive=20` run completed normally.
+
+Final checkpoint:
+
+- [outputs_distill_snrinput_noprecond_edgepos20_4k/consistency_distill_20260424_105301/checkpoints/step_4000.pt](/shared/healthinfolab/phz24002/PocketXMol/outputs_distill_snrinput_noprecond_edgepos20_4k/consistency_distill_20260424_105301/checkpoints/step_4000.pt)
+
+Edge diagnostic:
+
+- [outputs_edge_diagnostics/euler_snrinput_noprecond_edgepos20_step4000_20260424_bs4/edge_diagnostic.csv](/shared/healthinfolab/phz24002/PocketXMol/outputs_edge_diagnostics/euler_snrinput_noprecond_edgepos20_step4000_20260424_bs4/edge_diagnostic.csv)
+
+Small eval:
+
+- [outputs_consistency_eval_snrinput_noprecond_edgepos20_step4000/consistency_eval_20260424_142131/summary.csv](/shared/healthinfolab/phz24002/PocketXMol/outputs_consistency_eval_snrinput_noprecond_edgepos20_step4000/consistency_eval_20260424_142131/summary.csv)
+
+Edge fractions:
+
+| sample_steps | pred positive-bond frac |
+|---:|---:|
+| 8 | 0.1020 |
+| 100 | 0.1017 |
+
+Eval summary:
+
+| sample_steps | recon_success | complete | validity | connectivity |
+|---:|---:|---:|---:|---:|
+| 8 | 0.31 | 0.30 | 0.31 | 0.9677 |
+| 100 | 0.47 | 0.47 | 0.47 | 1.0000 |
+
+Interpretation:
+
+- Removing cosine preconditioning strongly increases connectivity and completeness.
+- But it also collapses chemical validity / reconstruction quality.
+- The dominant failure mode is no longer "too few bonds / disconnected fragments".
+- The new failure mode is closer to "strongly connected but chemically invalid / unreconstructable outputs".
+
+## 2026-04-24 EdgePos10 Controlled Retrain Started
+
+To see whether the no-preconditioning setup was simply overdriving positive-edge pressure, started a third controlled `4k` run with reduced positive-edge weight.
+
+Config:
+
+- [configs/distill/distill_pxm_euler_snrinput_noprecond_edgepos10_4k.yaml](/shared/healthinfolab/phz24002/PocketXMol/configs/distill/distill_pxm_euler_snrinput_noprecond_edgepos10_4k.yaml)
+
+Changes relative to the previous run:
+
+- keep:
+  - `position_input_mode = snr_scaled`
+  - `pos_preconditioning = none`
+- change:
+  - `edge_positive: 20 -> 10`
+
+Runtime:
+
+- host: `gpu35`
+- physical GPU: `GPU1`
+- output dir:
+  [outputs_distill_snrinput_noprecond_edgepos10_4k/consistency_distill_20260424_144656](/shared/healthinfolab/phz24002/PocketXMol/outputs_distill_snrinput_noprecond_edgepos10_4k/consistency_distill_20260424_144656)
+
+## 2026-04-25 No-Preconditioning + EdgePos10 4k Result
+
+The `snr_scaled + no_preconditioning + edge_positive=10` run completed normally.
+
+Final checkpoint:
+
+- [outputs_distill_snrinput_noprecond_edgepos10_4k/consistency_distill_20260424_144656/checkpoints/step_4000.pt](/shared/healthinfolab/phz24002/PocketXMol/outputs_distill_snrinput_noprecond_edgepos10_4k/consistency_distill_20260424_144656/checkpoints/step_4000.pt)
+
+Edge diagnostic:
+
+- [outputs_edge_diagnostics/euler_snrinput_noprecond_edgepos10_step4000_20260425_bs4/edge_diagnostic.csv](/shared/healthinfolab/phz24002/PocketXMol/outputs_edge_diagnostics/euler_snrinput_noprecond_edgepos10_step4000_20260425_bs4/edge_diagnostic.csv)
+
+Small eval:
+
+- [outputs_consistency_eval_snrinput_noprecond_edgepos10_step4000/consistency_eval_20260425_001354/summary.csv](/shared/healthinfolab/phz24002/PocketXMol/outputs_consistency_eval_snrinput_noprecond_edgepos10_step4000/consistency_eval_20260425_001354/summary.csv)
+
+Edge fractions:
+
+| sample_steps | pred positive-bond frac |
+|---:|---:|
+| 8 | 0.1010 |
+| 100 | 0.1010 |
+
+Eval summary:
+
+| sample_steps | recon_success | complete | validity | connectivity |
+|---:|---:|---:|---:|---:|
+| 8 | 0.34 | 0.33 | 0.34 | 0.9706 |
+| 100 | 0.51 | 0.50 | 0.51 | 0.9804 |
+
+Comparison against `edge_positive=20`:
+
+| config | sample_steps | complete | validity | connectivity |
+|---|---:|---:|---:|---:|
+| no-precond, edgepos20 | 8 | 0.30 | 0.31 | 0.9677 |
+| no-precond, edgepos10 | 8 | 0.33 | 0.34 | 0.9706 |
+| no-precond, edgepos20 | 100 | 0.47 | 0.47 | 1.0000 |
+| no-precond, edgepos10 | 100 | 0.50 | 0.51 | 0.9804 |
+
+Current conclusion:
+
+- `edge_positive=10` is slightly better than `20` in the same `snr_scaled + no_preconditioning` regime.
+- However, the core bottleneck has clearly shifted:
+  - disconnected-fragment collapse is no longer the main issue
+  - the main issue is now chemical validity / reconstruction failure in highly connected samples
+- Further scalar tuning of `edge_positive` alone is unlikely to solve the remaining gap.
+
+Recommended next step:
+
+- stop treating connectivity as the dominant bottleneck
+- run a failure-mode diagnostic on invalid / unreconstructable `8-step` samples from the `edgepos10` run
+- separate whether the remaining failures are dominated by:
+  - invalid valence
+  - wrong bond order
+  - atom-type mismatch
+  - geometry causing reconstruction failure
+
+## 2026-04-30 8-Step Failure-Mode Diagnostic
+
+Ran a targeted failure analysis on the best current short-run checkpoint:
+
+- config:
+  `snr_scaled + no_preconditioning + edge_positive=10`
+- eval root:
+  [outputs_consistency_eval_snrinput_noprecond_edgepos10_step4000/consistency_eval_20260425_001354](/shared/healthinfolab/phz24002/PocketXMol/outputs_consistency_eval_snrinput_noprecond_edgepos10_step4000/consistency_eval_20260425_001354)
+
+Diagnostic outputs:
+
+- sample-level summary:
+  [diagnostic_summary.csv](/shared/healthinfolab/phz24002/PocketXMol/outputs_consistency_eval_snrinput_noprecond_edgepos10_step4000/consistency_eval_20260425_001354/diagnostic_summary.csv)
+- invalid-SDF summary:
+  [invalid_sdf_summary.csv](/shared/healthinfolab/phz24002/PocketXMol/outputs_consistency_eval_snrinput_noprecond_edgepos10_step4000/consistency_eval_20260425_001354/invalid_sdf_summary.csv)
+- invalid-SDF per-sample table:
+  [invalid_sdf_samples.csv](/shared/healthinfolab/phz24002/PocketXMol/outputs_consistency_eval_snrinput_noprecond_edgepos10_step4000/consistency_eval_20260425_001354/invalid_sdf_samples.csv)
+
+### Outcome split
+
+For `8-step`:
+
+- `count_complete = 33`
+- `count_incomp = 1`
+- `count_bad = 66`
+
+So the current failure mode is **not** disconnected fragments anymore. There is only `1` incomplete sample; almost every failure is a `bad` molecule that cannot be sanitized / reconstructed.
+
+### Invalid-SDF error families
+
+For the `66` bad `8-step` samples:
+
+- `55` are `explicit_valence`
+- `10` are `kekulize`
+- `1` is `sanitize_ok` but still tagged upstream as bad
+
+For comparison, `100-step` has the same pattern:
+
+- `42` `explicit_valence`
+- `7` `kekulize`
+
+So the dominant remaining bottleneck is now:
+
+- over-bonded / over-ordered local chemistry
+- aromatic / bond-order assignments that cannot be kekulized
+
+### Which atoms are failing valence
+
+Among the `8-step` explicit-valence failures, the offending elements are:
+
+- `C: 28`
+- `O: 20`
+- `F: 5`
+- `N: 1`
+- `P: 1`
+
+Observed invalid valence values are dominated by:
+
+- valence `5`: `23`
+- valence `3`: `19`
+- valence `2`: `5`
+- valence `6`: `5`
+
+Representative recurring failures:
+
+- carbon with valence `5` or `6` (and one valence `7`)
+- oxygen with valence `3`
+- fluorine with valence `2`
+
+This is consistent with a regime where the model has largely fixed connectivity but is now assigning too many bonds / overly aggressive bond orders.
+
+### Sample characteristics
+
+For bad `8-step` samples:
+
+- `bad_num_atoms_mean = 24.88`
+- `bad_num_bonds_mean = 29.98`
+- `bad_cfd_node_mean = 5.62`
+- `bad_cfd_edge_mean = 12.38`
+
+Mean bad-sample confidence by family:
+
+| error_family | cfd_node | cfd_edge | num_atoms | num_bonds |
+|---|---:|---:|---:|---:|
+| explicit_valence | 5.679 | 12.296 | 24.836 | 30.127 |
+| kekulize | 5.463 | 12.902 | 25.200 | 29.600 |
+
+So these invalid samples are not obviously low-confidence outliers; the model is making fairly confident chemically illegal decisions.
+
+### Current interpretation
+
+The project has now clearly moved out of the original "missing edges / disconnected fragments" failure regime.
+
+The main remaining failure mode is:
+
+- high-connectivity molecules with illegal local chemistry
+- especially carbon/oxygen valence overflow
+- plus a smaller aromatic / kekulization problem
+
+This means further tuning of `edge_positive` alone is unlikely to be enough. The next corrective experiments should target chemical legality more directly, e.g.:
+
+- add a more direct supervised edge CE term instead of only EMA edge KL
+- add valence-aware constraints / penalties / post-processing
+- inspect bond-order predictions on bad samples, not just edge presence
+
+## 2026-05-08 Edge Supervised CE Controlled Run
+
+Based on the April 30 failure-mode diagnostic, started a controlled run that adds a small direct supervised edge cross-entropy term. The goal is to test whether a ground-truth edge anchor can reduce the over-bonding / invalid-valence regime without losing the 8-step connectivity gains.
+
+Code changes:
+
+- [models/consistency_loss.py](/shared/healthinfolab/phz24002/PocketXMol/models/consistency_loss.py)
+  - added `edge_supervised_weight`
+  - when `edge_target_type` is provided, computes:
+    `CE(student_pred_halfedge_logits_x0, batch["halfedge_type"])`
+  - adds `edge_supervised_weight * edge_supervised_loss` to total loss
+- [scripts/train_consistency.py](/shared/healthinfolab/phz24002/PocketXMol/scripts/train_consistency.py)
+  - reads `distill.loss_weights.edge_supervised`
+  - logs `train/loss_edge_supervised`
+
+Config:
+
+- [configs/distill/distill_pxm_euler_snrinput_noprecond_edgepos10_edgece01_4k.yaml](/shared/healthinfolab/phz24002/PocketXMol/configs/distill/distill_pxm_euler_snrinput_noprecond_edgepos10_edgece01_4k.yaml)
+
+Only intended change relative to the previous best short-run config:
+
+- keep:
+  - `position_input_mode = snr_scaled`
+  - `pos_preconditioning = none`
+  - `edge_positive = 10.0`
+  - `max_steps = 4000`
+- add:
+  - `edge_supervised = 0.1`
+
+Runtime:
+
+- host: `gpu37`
+- physical GPU: `GPU1`
+- output root:
+  [outputs_distill_snrinput_noprecond_edgepos10_edgece01_4k](/shared/healthinfolab/phz24002/PocketXMol/outputs_distill_snrinput_noprecond_edgepos10_edgece01_4k)
+- current run:
+  [outputs_distill_snrinput_noprecond_edgepos10_edgece01_4k/consistency_distill_20260508_031946](/shared/healthinfolab/phz24002/PocketXMol/outputs_distill_snrinput_noprecond_edgepos10_edgece01_4k/consistency_distill_20260508_031946)
+- launch log:
+  [outputs_distill_snrinput_noprecond_edgepos10_edgece01_4k_launch/train_gpu37_gpu1_20260507.out](/shared/healthinfolab/phz24002/PocketXMol/outputs_distill_snrinput_noprecond_edgepos10_edgece01_4k_launch/train_gpu37_gpu1_20260507.out)
+
+Current status at note update:
+
+- training is running normally
+- checkpoint saved through `step_2000.pt`
+- latest observed log line: `step=2500`
+- example logged supervised CE values:
+  - `step=2000`: `edge_ce = 0.110090`
+  - `step=2400`: `edge_ce = 0.009671`
+  - `step=2500`: `edge_ce = 0.054677`
+
+Evaluation plan after `step_4000.pt`:
+
+- run edge diagnostic on `8-step` and `100-step`
+- run small SBDD eval focused on `8-step`
+- rerun invalid-SDF diagnostic
+- compare against the previous `edge_positive=10` baseline:
+  - `8-step complete = 0.33`
+  - `8-step validity = 0.34`
+  - `8-step connectivity = 0.9706`
+  - `8-step bad = 66`
+  - `8-step explicit_valence = 55`
+
+Primary success criterion:
+
+- reduce `8-step` explicit-valence failures without collapsing connectivity.

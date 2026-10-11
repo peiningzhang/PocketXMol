@@ -22,6 +22,8 @@ distill:
   sampling:
     coordinate_update: euler
     discrete_update: categorical_transition
+    position_input_mode: raw
+    pos_preconditioning: cosine
     campbell_sigma_data: 1.0
     campbell_stochasticity: 2.0
 

@@ -20,6 +20,8 @@ from models.maskfill import PMAsymDenoiser
 from utils.consistency import (
     add_log_sigma_to_model_config,
     build_transitions,
+    get_position_input_mode,
+    get_pos_preconditioning_mode,
     get_sampling_update_modes,
     get_task_noise_cfg,
     infer_train_config_path_from_ckpt,
@@ -83,6 +85,8 @@ def main():
 
     task_noise_cfg = get_task_noise_cfg(teacher_train_cfg.noise, distill_cfg.task_name)
     coordinate_update, discrete_update = get_sampling_update_modes(distill_cfg)
+    position_input_mode = get_position_input_mode(distill_cfg)
+    pos_preconditioning_mode = get_pos_preconditioning_mode(distill_cfg)
     sampling_cfg = getattr(distill_cfg, "sampling", None)
     transitions = build_transitions(
         num_steps=int(distill_cfg.num_steps),
@@ -98,9 +102,11 @@ def main():
     )
 
     logger.info(
-        "Loaded model. coordinate_update=%s discrete_update=%s",
+        "Loaded model. coordinate_update=%s discrete_update=%s position_input=%s pos_preconditioning=%s",
         coordinate_update,
         discrete_update,
+        position_input_mode,
+        pos_preconditioning_mode,
     )
 
     rows = []
@@ -125,6 +131,8 @@ def main():
                 coordinate_update=coordinate_update,
                 discrete_update=discrete_update,
                 sampling_cfg=sampling_cfg,
+                position_input_mode=position_input_mode,
+                pos_preconditioning_mode=pos_preconditioning_mode,
             )
 
             pred_edge_type = outputs["pred_halfedge"].argmax(dim=-1)

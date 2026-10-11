@@ -30,10 +30,13 @@ from utils.consistency import (
     get_task_noise_cfg,
     infer_train_config_path_from_ckpt,
     normalize_pred_x0,
+    get_model_pos_input,
+    get_position_input_mode,
+    get_pos_preconditioning_mode,
     to_plain_dict,
     inject_log_sigma,
     add_log_sigma_to_model_config,
-    apply_cosine_pos_preconditioning,
+    apply_pos_preconditioning,
 )
 from utils.dataset import ForeverTaskDataset
 from utils.misc import get_logger, get_new_log_dir, make_config, save_config, seed_all
@@ -488,6 +491,13 @@ def main():
         schedule_type=schedule_type,
     )
     logger.info("Built %s grid with %d steps", schedule_type.capitalize(), int(distill_cfg.num_steps))
+    position_input_mode = get_position_input_mode(distill_cfg)
+    pos_preconditioning_mode = get_pos_preconditioning_mode(distill_cfg)
+    logger.info(
+        "Position input mode=%s, pos preconditioning=%s",
+        position_input_mode,
+        pos_preconditioning_mode,
+    )
 
     optimizer = torch.optim.AdamW(
         student.parameters(),
@@ -504,6 +514,7 @@ def main():
         node_weight=float(distill_cfg.loss_weights.node),
         edge_weight=float(distill_cfg.loss_weights.halfedge),
         edge_positive_weight=float(getattr(distill_cfg.loss_weights, "edge_positive", 1.0)),
+        edge_supervised_weight=float(getattr(distill_cfg.loss_weights, "edge_supervised", 0.0)),
         physics_weight=float(getattr(distill_cfg.loss_weights, "physics", 0.0)),
     )
 
@@ -579,7 +590,13 @@ def main():
                 node_high, log_node_high, _ = transitions["node"].add_noise(batch["node_type"], t_high_graph, batch=node_batch)
                 edge_high, log_edge_high, _ = transitions["edge"].add_noise(batch["halfedge_type"], t_high_graph, batch=edge_batch)
                 pos_high = transitions["pos"].add_noise(batch["node_pos"], t_high_graph, batch=node_batch)
-                pos_high_in = pos_high
+                pos_high_in = get_model_pos_input(
+                    pos_high,
+                    transitions,
+                    t_high_graph,
+                    node_batch,
+                    position_input_mode=position_input_mode,
+                )
 
                 teacher_batch = copy.copy(batch)
                 teacher_batch["node_in"] = node_high
@@ -589,8 +606,13 @@ def main():
 
                 with torch.no_grad():
                     teacher_pred = normalize_pred_x0(teacher(teacher_batch))
-                    teacher_pred = apply_cosine_pos_preconditioning(
-                        teacher_pred, pos_high, transitions, t_high_graph, node_batch
+                    teacher_pred = apply_pos_preconditioning(
+                        teacher_pred,
+                        pos_high_in,
+                        transitions,
+                        t_high_graph,
+                        node_batch,
+                        mode=pos_preconditioning_mode,
                     )
                     teacher_log_node_x0 = F.log_softmax(teacher_pred["pred_node_logits_x0"], dim=-1)
                     teacher_log_edge_x0 = F.log_softmax(teacher_pred["pred_halfedge_logits_x0"], dim=-1)
@@ -618,15 +640,26 @@ def main():
                     )
                     edge_low_hat = log_sample_categorical(log_edge_low)
 
-                    pos_low_in = pos_low_hat
+                    pos_low_in = get_model_pos_input(
+                        pos_low_hat,
+                        transitions,
+                        t_low_graph,
+                        node_batch,
+                        position_input_mode=position_input_mode,
+                    )
                     ema_batch = copy.copy(batch)
                     ema_batch["node_in"] = node_low_hat
                     ema_batch["halfedge_in"] = edge_low_hat
                     ema_batch["pos_in"] = pos_low_in
                     inject_log_sigma(ema_batch, transitions, t_low_graph, node_batch)
                     ema_pred = normalize_pred_x0(ema_student(ema_batch))
-                    ema_pred = apply_cosine_pos_preconditioning(
-                        ema_pred, pos_low_hat, transitions, t_low_graph, node_batch
+                    ema_pred = apply_pos_preconditioning(
+                        ema_pred,
+                        pos_low_in,
+                        transitions,
+                        t_low_graph,
+                        node_batch,
+                        mode=pos_preconditioning_mode,
                     )
 
                 student_batch = copy.copy(batch)
@@ -635,8 +668,13 @@ def main():
                 student_batch["pos_in"] = pos_high_in
                 inject_log_sigma(student_batch, transitions, t_high_graph, node_batch)
                 student_pred = normalize_pred_x0(student(student_batch))
-                student_pred = apply_cosine_pos_preconditioning(
-                    student_pred, pos_high, transitions, t_high_graph, node_batch
+                student_pred = apply_pos_preconditioning(
+                    student_pred,
+                    pos_high_in,
+                    transitions,
+                    t_high_graph,
+                    node_batch,
+                    mode=pos_preconditioning_mode,
                 )
 
                 loss_dict = loss_fn(
@@ -698,6 +736,7 @@ def main():
             "train/loss_pos": float(loss_dict["pos"].detach().cpu()),
             "train/loss_node": float(loss_dict["node_type"].detach().cpu()),
             "train/loss_edge": float(loss_dict["edge_type"].detach().cpu()),
+            "train/loss_edge_supervised": float(loss_dict["edge_supervised"].detach().cpu()),
             "train/lr": optimizer.param_groups[0]["lr"],
             "train/grad_norm": float(grad_norm.detach().cpu()) if torch.is_tensor(grad_norm) else float(grad_norm),
         }
@@ -711,12 +750,13 @@ def main():
             wandb_run.log(scalars, step=step)
         if step % log_interval == 0:
             logger.info(
-                "step=%d total=%.6f pos=%.6f node=%.6f edge=%.6f mem_alloc=%.1fMB",
+                "step=%d total=%.6f pos=%.6f node=%.6f edge=%.6f edge_ce=%.6f mem_alloc=%.1fMB",
                 step,
                 scalars["train/loss_total"],
                 scalars["train/loss_pos"],
                 scalars["train/loss_node"],
                 scalars["train/loss_edge"],
+                scalars["train/loss_edge_supervised"],
                 scalars["train/mem_alloc_mb"],
             )
         prog.set_postfix(

@@ -48,6 +48,7 @@ class MixedStateConsistencyLoss(nn.Module):
         node_weight: float = 1.0,
         edge_weight: float = 1.0,
         edge_positive_weight: float = 1.0,
+        edge_supervised_weight: float = 0.0,
         physics_weight: float = 0.0,
     ):
         super().__init__()
@@ -55,6 +56,7 @@ class MixedStateConsistencyLoss(nn.Module):
         self.node_weight = float(node_weight)
         self.edge_weight = float(edge_weight)
         self.edge_positive_weight = float(edge_positive_weight)
+        self.edge_supervised_weight = float(edge_supervised_weight)
         self.physics_weight = float(physics_weight)
 
     def forward(
@@ -90,6 +92,14 @@ class MixedStateConsistencyLoss(nn.Module):
                 edge_weights,
             )
         edge_loss = _weighted_masked_mean(edge_kl_all, mask_edge, edge_weights)
+        edge_supervised_loss = edge_loss.new_zeros(())
+        if edge_target_type is not None and self.edge_supervised_weight != 0.0:
+            edge_supervised_all = F.cross_entropy(
+                student_pred_x0["pred_halfedge_logits_x0"],
+                edge_target_type,
+                reduction="none",
+            )
+            edge_supervised_loss = _masked_mean(edge_supervised_all, mask_edge)
 
         physics_loss = compute_joint_physics_loss(
             student_pred_x0["pred_pos_x0"],
@@ -99,12 +109,14 @@ class MixedStateConsistencyLoss(nn.Module):
             self.pos_weight * pos_loss
             + self.node_weight * node_loss
             + self.edge_weight * edge_loss
+            + self.edge_supervised_weight * edge_supervised_loss
             + self.physics_weight * physics_loss
         )
         return {
             "pos": pos_loss,
             "node_type": node_loss,
             "edge_type": edge_loss,
+            "edge_supervised": edge_supervised_loss,
             "physics": physics_loss,
             "total": total,
         }

@@ -147,9 +147,46 @@ def get_sampling_update_modes(distill_cfg) -> Tuple[str, str]:
     return coordinate_update, discrete_update
 
 
+def get_position_input_mode(distill_cfg) -> str:
+    sampling_cfg = getattr(distill_cfg, "sampling", None)
+    if sampling_cfg is None:
+        return "raw"
+    return str(getattr(sampling_cfg, "position_input_mode", "raw"))
+
+
+def get_pos_preconditioning_mode(distill_cfg) -> str:
+    sampling_cfg = getattr(distill_cfg, "sampling", None)
+    if sampling_cfg is None:
+        return "cosine"
+    return str(getattr(sampling_cfg, "pos_preconditioning", "cosine"))
+
+
 def _gather_sigma(transitions: Dict[str, object], t_graph: torch.Tensor, batch_index: torch.Tensor) -> torch.Tensor:
     sigmas = transitions["sigmas"].index_select(0, t_graph)
     return sigmas.index_select(0, batch_index).unsqueeze(-1)
+
+
+def get_pos_snr_scale(
+    transitions: Dict[str, object],
+    t_graph: torch.Tensor,
+    node_batch: torch.Tensor,
+) -> torch.Tensor:
+    sigma = _gather_sigma(transitions, t_graph, node_batch)
+    return torch.rsqrt(1.0 + sigma * sigma)
+
+
+def get_model_pos_input(
+    pos_state: torch.Tensor,
+    transitions: Dict[str, object],
+    t_graph: torch.Tensor,
+    node_batch: torch.Tensor,
+    position_input_mode: str,
+) -> torch.Tensor:
+    if position_input_mode == "raw":
+        return pos_state
+    if position_input_mode == "snr_scaled":
+        return pos_state * get_pos_snr_scale(transitions, t_graph, node_batch)
+    raise ValueError(f"Unknown position input mode: {position_input_mode}")
 
 
 def inject_log_sigma(
@@ -229,6 +266,27 @@ def apply_cosine_pos_preconditioning(
     result = dict(pred_x0_dict)
     result["pred_pos_x0"] = blended
     return result
+
+
+def apply_pos_preconditioning(
+    pred_x0_dict: dict,
+    pos_in: torch.Tensor,
+    transitions: Dict[str, object],
+    t_graph: torch.Tensor,
+    node_batch: torch.Tensor,
+    mode: str,
+) -> dict:
+    if mode == "none":
+        return pred_x0_dict
+    if mode == "cosine":
+        return apply_cosine_pos_preconditioning(
+            pred_x0_dict,
+            pos_in,
+            transitions,
+            t_graph,
+            node_batch,
+        )
+    raise ValueError(f"Unknown pos preconditioning mode: {mode}")
 
 
 @torch.no_grad()
