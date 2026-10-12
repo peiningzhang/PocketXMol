@@ -1,0 +1,478 @@
+{
+  "complete": true,
+  "runs": 67,
+  "events": 7380,
+  "rows": [
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p4_i20_b2_s12026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 80,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p4_i20_b2_s2026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 80,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p4_i20_b2_s22026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 80,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p4_i20_b5_s12026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 80,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p4_i20_b5_s2026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 80,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p4_i20_b5_s22026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 80,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p4_i50_b2_s12026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 20,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p4_i50_b2_s2026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 20,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p4_i50_b2_s22026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 20,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p4_i50_b5_s12026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 20,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p4_i50_b5_s2026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 20,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p4_i50_b5_s22026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 20,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p8_i20_b2_s12026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 80,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p8_i20_b2_s2026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 80,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p8_i20_b2_s22026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 80,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p8_i20_b5_s12026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 80,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p8_i20_b5_s2026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 80,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p8_i20_b5_s22026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 80,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p8_i50_b2_s12026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 20,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p8_i50_b2_s2026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 20,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p8_i50_b2_s22026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 20,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p8_i50_b5_s12026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 20,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p8_i50_b5_s2026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 20,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p8_i50_b5_s22026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 20,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b400_s12026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 80,
+      "planned_pockets": 80,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b400_s2026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 80,
+      "planned_pockets": 80,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b400_s22026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 80,
+      "planned_pockets": 80,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b400_s32026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 80,
+      "planned_pockets": 80,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b400_s42026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 80,
+      "planned_pockets": 80,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b800_s12026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 80,
+      "planned_pockets": 80,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b800_s2026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 80,
+      "planned_pockets": 80,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b800_s22026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 80,
+      "planned_pockets": 80,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b800_s32026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 80,
+      "planned_pockets": 80,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b800_s42026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 80,
+      "planned_pockets": 80,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_extensions/fk_i50_b5_b400_s32026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 20,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_extensions/fk_i50_b5_b400_s42026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 20,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_extensions/fk_i50_b5_b800_s32026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 20,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_extensions/fk_i50_b5_b800_s42026",
+      "kind": "particle_diagnostics.json",
+      "event_count": 20,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/partial_confidence_r3_s22026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 60,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/partial_random_r3_s22026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 60,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_conditioning_v2/partial_confidence_r1_s12026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 20,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_conditioning_v2/partial_confidence_r1_s2026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 20,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_conditioning_v2/partial_confidence_r1_s22026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 20,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_conditioning_v2/partial_confidence_r3_s12026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 60,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_conditioning_v2/partial_confidence_r3_s2026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 60,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_conditioning_v2/partial_random_r1_s12026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 20,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_conditioning_v2/partial_random_r1_s2026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 20,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_conditioning_v2/partial_random_r1_s22026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 20,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_conditioning_v2/partial_random_r3_s12026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 60,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_conditioning_v2/partial_random_r3_s2026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 60,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/partial_confidence_b400_s12026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 240,
+      "planned_pockets": 80,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/partial_confidence_b400_s2026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 240,
+      "planned_pockets": 80,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/partial_confidence_b400_s22026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 240,
+      "planned_pockets": 80,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/partial_confidence_b400_s32026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 240,
+      "planned_pockets": 80,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/partial_confidence_b400_s42026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 240,
+      "planned_pockets": 80,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/partial_confidence_b800_s12026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 560,
+      "planned_pockets": 80,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/partial_confidence_b800_s2026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 560,
+      "planned_pockets": 80,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/partial_confidence_b800_s22026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 560,
+      "planned_pockets": 80,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/partial_confidence_b800_s32026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 560,
+      "planned_pockets": 80,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/partial_confidence_b800_s42026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 560,
+      "planned_pockets": 80,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_extensions/partial_confidence_b400_s32026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 60,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_extensions/partial_confidence_b400_s42026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 60,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_extensions/partial_confidence_b800_s12026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 140,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_extensions/partial_confidence_b800_s2026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 140,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_extensions/partial_confidence_b800_s22026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 140,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_extensions/partial_confidence_b800_s32026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 140,
+      "planned_pockets": 20,
+      "issues": []
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_extensions/partial_confidence_b800_s42026",
+      "kind": "partial_diagnostics.json",
+      "event_count": 140,
+      "planned_pockets": 20,
+      "issues": []
+    }
+  ],
+  "timestamp": 1791746441.6338408,
+  "scope": "All generated formal v2 partial and FK runs across development, repaired development, confirmation and extensions; runtime assertions recorded in each event; old v1 diagnostic excluded"
+}

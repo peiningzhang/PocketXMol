@@ -51,7 +51,7 @@ def add_info_to_dict(data_dict, data, mode):
         data_dict[key].append(this.detach().cpu())
 
 
-def sample_loop3(batch, model, noiser, device=None, is_ar='', off_tqdm=False):
+def sample_loop3(batch, model, noiser, device=None, is_ar='', off_tqdm=False, record_trajectory=True):
     """
     Main sampling loop for reverse diffusion process.
     
@@ -72,12 +72,13 @@ def sample_loop3(batch, model, noiser, device=None, is_ar='', off_tqdm=False):
             - outputs: Model predictions and confidence scores
             - trajectories: Complete generation trajectory for analysis
     """
+    track_info = add_info_to_dict if record_trajectory else (lambda *args: None)
     # Initialize trajectory tracking for ground truth and parts
     traj_dict = {'node': [], 'pos': [], 'halfedge': []}
     cfd_traj = []
     mol_parts = get_mol_parts_linking(batch, device=device)
     for data_mol in [batch] + mol_parts:
-        add_info_to_dict(traj_dict, data_mol, 'gt')
+        track_info(traj_dict, data_mol, 'gt')
 
     # Initialize dictionaries for input, output, and raw predictions
     in_dict = {'node': [], 'pos': [], 'halfedge': []}
@@ -92,16 +93,16 @@ def sample_loop3(batch, model, noiser, device=None, is_ar='', off_tqdm=False):
             with torch.no_grad():
                 # Add noise for current timestep
                 batch = noiser(batch, step)
-                add_info_to_dict(in_dict, batch, 'in')
-                add_info_to_dict(traj_dict, batch, 'in')
+                track_info(in_dict, batch, 'in')
+                track_info(traj_dict, batch, 'in')
                 
                 # Denoise and update batch for next step
                 outputs = model(batch) 
                 batch.update({'step': step})
                 batch = noiser.outputs2batch(batch, outputs)  # M-Projector (what a strange name, I (xingang) do not like it)
-                add_info_to_dict(out_dict, batch, 'out')
-                add_info_to_dict(traj_dict, batch, 'out')
-                add_info_to_dict(raw_dict, outputs, 'raw_out')
+                track_info(out_dict, batch, 'out')
+                track_info(traj_dict, batch, 'out')
+                track_info(raw_dict, outputs, 'raw_out')
                 cfd_traj.append(outputs['confidence_pos'].detach().flatten())
 
         # Handle auto-regressive generation (if enabled)
@@ -110,15 +111,19 @@ def sample_loop3(batch, model, noiser, device=None, is_ar='', off_tqdm=False):
                 batch = noiser.outputs2batch_ar(batch, outputs, step_ar, cfd_traj)
             elif is_ar == 'ar2':
                 batch = noiser.outputs2batch_ar2(batch, outputs)
-            add_info_to_dict(out_dict, batch, 'out')
-            add_info_to_dict(traj_dict, batch, 'out')
-            add_info_to_dict(raw_dict, outputs, 'raw_out')
+            track_info(out_dict, batch, 'out')
+            track_info(traj_dict, batch, 'out')
+            track_info(raw_dict, outputs, 'raw_out')
             if batch['node_p2'].shape[0] == 0:
                 break
             step_ar += 1
         else:
             break
     
+    if not record_trajectory:
+        outputs['confidence_pos_traj'] = torch.stack(cfd_traj, dim=-1)
+        return batch, outputs, None
+
     # Stack trajectories into arrays
     all_trajs, in_trajs, out_trajs = {}, {}, {}
     raw_trajs = {}

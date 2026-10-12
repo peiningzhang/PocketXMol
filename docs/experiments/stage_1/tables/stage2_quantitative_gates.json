@@ -1,0 +1,101 @@
+{
+  "results": [
+    {
+      "method": "fk_i50_b5",
+      "budget": 400,
+      "actual_nfe_all_pairs_matched": true,
+      "validity_complete_guardrails": true,
+      "criterion1_quality": false,
+      "criterion2_cost": false,
+      "co_primary": {
+        "P_phys": {
+          "delta": 0.0049999999999999,
+          "ci_low": -0.0349999999999999,
+          "ci_high": 0.045
+        },
+        "P_joint": {
+          "delta": -0.05,
+          "ci_low": -0.0925,
+          "ci_high": -0.0075
+        }
+      },
+      "controlled_cost_ratio": 0.9228053578603648,
+      "controlled_trial_ratio_max": 0.9547988542336248,
+      "size_coverage_diversity_review": "required",
+      "criterion3_mechanism": "requires reproducible evidence and effective control; report review"
+    },
+    {
+      "method": "fk_i50_b5",
+      "budget": 800,
+      "actual_nfe_all_pairs_matched": true,
+      "validity_complete_guardrails": true,
+      "criterion1_quality": false,
+      "criterion2_cost": false,
+      "co_primary": {
+        "P_phys": {
+          "delta": 0.0225,
+          "ci_low": -0.0175,
+          "ci_high": 0.0625
+        },
+        "P_joint": {
+          "delta": -0.005,
+          "ci_low": -0.055,
+          "ci_high": 0.045
+        }
+      },
+      "controlled_cost_ratio": 1.0536525394473426,
+      "controlled_trial_ratio_max": 1.0862475493535484,
+      "size_coverage_diversity_review": "required",
+      "criterion3_mechanism": "requires reproducible evidence and effective control; report review"
+    },
+    {
+      "method": "partial_confidence",
+      "budget": 400,
+      "actual_nfe_all_pairs_matched": true,
+      "validity_complete_guardrails": false,
+      "criterion1_quality": false,
+      "criterion2_cost": false,
+      "co_primary": {
+        "P_phys": {
+          "delta": -0.345,
+          "ci_low": -0.4075,
+          "ci_high": -0.28
+        },
+        "P_joint": {
+          "delta": -0.18,
+          "ci_low": -0.2375,
+          "ci_high": -0.1299999999999999
+        }
+      },
+      "controlled_cost_ratio": 0.8817002419136174,
+      "controlled_trial_ratio_max": 0.9260184848461368,
+      "size_coverage_diversity_review": "required",
+      "criterion3_mechanism": "requires reproducible evidence and effective control; report review"
+    },
+    {
+      "method": "partial_confidence",
+      "budget": 800,
+      "actual_nfe_all_pairs_matched": true,
+      "validity_complete_guardrails": false,
+      "criterion1_quality": false,
+      "criterion2_cost": false,
+      "co_primary": {
+        "P_phys": {
+          "delta": -0.3099999999999999,
+          "ci_low": -0.37,
+          "ci_high": -0.2525
+        },
+        "P_joint": {
+          "delta": -0.1699999999999999,
+          "ci_low": -0.2225,
+          "ci_high": -0.1225
+        }
+      },
+      "controlled_cost_ratio": 0.8913787762499845,
+      "controlled_trial_ratio_max": 0.8998485746225707,
+      "size_coverage_diversity_review": "required",
+      "criterion3_mechanism": "requires reproducible evidence and effective control; report review"
+    }
+  ],
+  "decision_scope": "Quantitative gates only; no automatic Stage2 authorization without size/coverage/diversity and mechanism review"
+}

@@ -1,0 +1,49 @@
+{
+  "baseline_complete": true,
+  "decision": "no_clear_B800_upward_trend_no_N16_expansion",
+  "operational_rule": "Geometry-confidence deployed baseline: positive paired95CI lower bound in at least one co-primary, neither decreases >2pp; all100/five seeds must be complete",
+  "extension_if_triggered": {
+    "pocket_ids": "development_ids.txt",
+    "seeds": [
+      2026,
+      12026,
+      22026
+    ],
+    "budgets": [
+      800,
+      1600
+    ],
+    "controls": [
+      "independent100-step pool N16",
+      "more_steps1600",
+      "native_refinement extra15 rounds"
+    ],
+    "do_not_extend_rewards": true
+  },
+  "evidence": [
+    {
+      "subset": "all",
+      "method": "geometry_confidence",
+      "low_budget": 400,
+      "high_budget": 800,
+      "metric": "P_phys",
+      "delta": 0.014000000000000002,
+      "ci_low": -0.014000000000000005,
+      "ci_high": 0.044000000000000004,
+      "pockets": 100,
+      "pairs": 500
+    },
+    {
+      "subset": "all",
+      "method": "geometry_confidence",
+      "low_budget": 400,
+      "high_budget": 800,
+      "metric": "P_joint",
+      "delta": 0.02,
+      "ci_low": -0.008,
+      "ci_high": 0.04800000000000001,
+      "pockets": 100,
+      "pairs": 500
+    }
+  ]
+}

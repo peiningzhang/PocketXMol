@@ -1,0 +1,62 @@
+[
+  {
+    "event": "P_phys_round_repair",
+    "run": "partial_confidence_r3_s12026",
+    "data_id": "csd_100001",
+    "seed": 12026,
+    "round": 2,
+    "before_sdf": "/shared/healthinfolab/phz24002/PocketXMol/outputs_test_time_scaling/stage_1/development_conditioning_v2/partial_confidence_r3_s12026/diagnostic_states/round1/SDF/1.sdf",
+    "after_sdf": "/shared/healthinfolab/phz24002/PocketXMol/outputs_test_time_scaling/stage_1/development_conditioning_v2/partial_confidence_r3_s12026/diagnostic_states/round2/SDF/1.sdf",
+    "selected_atom_indices_local": [
+      5,
+      7,
+      9
+    ],
+    "canonical_smiles_before": "C[C@H](CC=CCC(=O)O)C(=O)O",
+    "canonical_smiles_after": "C[C@H](CCCCC(=O)O)C(=O)O",
+    "chemical_identity_unchanged": false,
+    "drawing": "outputs_test_time_scaling/stage_1/repair_examples/P_phys_round_repair.svg"
+  },
+  {
+    "event": "P_phys_round_damage",
+    "run": "partial_confidence_r1_s12026",
+    "data_id": "csd_100000",
+    "seed": 12026,
+    "round": 1,
+    "before_sdf": "/shared/healthinfolab/phz24002/PocketXMol/outputs_test_time_scaling/stage_1/development_conditioning_v2/partial_confidence_r1_s12026/diagnostic_states/round0/SDF/0.sdf",
+    "after_sdf": "/shared/healthinfolab/phz24002/PocketXMol/outputs_test_time_scaling/stage_1/development_conditioning_v2/partial_confidence_r1_s12026/diagnostic_states/round1/SDF/0.sdf",
+    "selected_atom_indices_local": [
+      1,
+      2,
+      4,
+      5,
+      6,
+      9,
+      18,
+      19
+    ],
+    "canonical_smiles_before": "C[C@]1(O)[C@H](O)O[C@H](COO[C@H]2[C@H](OP(=O)(O)O)O[C@@H]([n+]3ccc(C(N)=O)cc3)[C@@H]2O)[C@@H]1O",
+    "canonical_smiles_after": "C[N+](=O)O[C@@H]1[C@@H](OOCCOCC(=O)O)[C@H](OP(=O)(O)O)O[C@H]1[n+]1ccc(C(N)=O)cc1",
+    "chemical_identity_unchanged": false,
+    "drawing": "outputs_test_time_scaling/stage_1/repair_examples/P_phys_round_damage.svg"
+  },
+  {
+    "event": "valid_round_damage",
+    "run": "partial_confidence_r3_s2026",
+    "data_id": "csd_100001",
+    "seed": 2026,
+    "round": 2,
+    "before_sdf": "/shared/healthinfolab/phz24002/PocketXMol/outputs_test_time_scaling/stage_1/development_conditioning_v2/partial_confidence_r3_s2026/diagnostic_states/round1/SDF/1.sdf",
+    "after_sdf": "/shared/healthinfolab/phz24002/PocketXMol/outputs_test_time_scaling/stage_1/development_conditioning_v2/partial_confidence_r3_s2026/diagnostic_states/round2/SDF/1-bad.sdf",
+    "selected_atom_indices_local": [
+      1,
+      10,
+      12,
+      13
+    ],
+    "canonical_smiles_before": "NC(=CC1=NC(=O)C2=CSC2=N1)C(=O)O",
+    "canonical_smiles_after": null,
+    "chemical_identity_unchanged": null,
+    "drawing": null
+  }
+]

@@ -1,0 +1,189 @@
+{
+  "complete": true,
+  "runs": 26,
+  "rows": [
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b400_s32026",
+      "batch_size": 4,
+      "particles": 4,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b800_s42026",
+      "batch_size": 4,
+      "particles": 8,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b800_s12026",
+      "batch_size": 4,
+      "particles": 8,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b800_s32026",
+      "batch_size": 4,
+      "particles": 8,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b400_s42026",
+      "batch_size": 4,
+      "particles": 4,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b400_s2026",
+      "batch_size": 4,
+      "particles": 4,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b400_s12026",
+      "batch_size": 4,
+      "particles": 4,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b800_s22026",
+      "batch_size": 4,
+      "particles": 8,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b400_s22026",
+      "batch_size": 4,
+      "particles": 4,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b800_s2026",
+      "batch_size": 4,
+      "particles": 8,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/timing/fk_i50_b5_b400_trial0",
+      "batch_size": 4,
+      "particles": 4,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/timing/fk_i50_b5_b800_trial0",
+      "batch_size": 4,
+      "particles": 8,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/timing/fk_i50_b5_b400_trial2",
+      "batch_size": 4,
+      "particles": 4,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/timing/fk_i50_b5_b800_trial1",
+      "batch_size": 4,
+      "particles": 8,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/timing/fk_i50_b5_b800_trial2",
+      "batch_size": 4,
+      "particles": 8,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/timing/fk_i50_b5_b400_trial1",
+      "batch_size": 4,
+      "particles": 4,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/timing_trace_control/fk_i50_b5_b800_trial1",
+      "batch_size": 4,
+      "particles": 8,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/timing_trace_control/fk_i50_b5_b800_trial2",
+      "batch_size": 4,
+      "particles": 8,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/timing_trace_control/fk_i50_b5_b400_trial1",
+      "batch_size": 4,
+      "particles": 4,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/timing_trace_control/fk_i50_b5_b400_trial2",
+      "batch_size": 4,
+      "particles": 4,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/timing_trace_control/fk_i50_b5_b400_trial0",
+      "batch_size": 4,
+      "particles": 4,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/timing_trace_control/fk_i50_b5_b800_trial0",
+      "batch_size": 4,
+      "particles": 8,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_extensions/fk_i50_b5_b800_s32026",
+      "batch_size": 4,
+      "particles": 8,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_extensions/fk_i50_b5_b400_s42026",
+      "batch_size": 4,
+      "particles": 4,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_extensions/fk_i50_b5_b800_s42026",
+      "batch_size": 4,
+      "particles": 8,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_extensions/fk_i50_b5_b400_s32026",
+      "batch_size": 4,
+      "particles": 4,
+      "model_call_graph_count_mean": 4.0,
+      "passed": true
+    }
+  ],
+  "source_evidence": "fk_particles.batched_forward chunks P8 into two max_batch4 calls; counter hook records actual graph count per forward"
+}

@@ -1,0 +1,10 @@
+{
+  "complete": true,
+  "pairs": 1500,
+  "bootstrap_resamples": 5000,
+  "cluster": "pocket after seed average",
+  "all_planned_native_outputs_retained": true,
+  "selector": "Frozen geometry-confidence ranking; no energy or Vina used",
+  "prefix_rule": "N=observed native graph-NFE/100, including diagnostic N3/5/6/7 prefixes; same raw N8 pool",
+  "scope": "Retrospective resource-matched diagnostic. Requires native observed NFE to choose reference prefix; not a deployable standalone allocation policy, not a replacement for predeclared N1/2/4/8 main curves."
+}

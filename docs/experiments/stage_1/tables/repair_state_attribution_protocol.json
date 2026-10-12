@@ -1,0 +1,7 @@
+{
+  "comparisons": 96,
+  "consecutive_rounds": true,
+  "index_origin": "historical batch-global indices converted using first saved batch graph offsets; explicit local indices preferred",
+  "mapping_condition": "Both decoded SDF atom counts equal raw graph count; decoder and reconstruction add atoms in original order",
+  "limitation": "SDF bond/charge changes can include reconstruction chemistry; raw fixed-context and pocket assertions are distinct evidence. Coordinate values are rounded by SDF serialization."
+}

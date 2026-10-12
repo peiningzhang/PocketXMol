@@ -560,6 +560,8 @@ def fix_aromatic(mol, strict=False):
             fixed = True
             Chem.SanitizeMol(mol)
             break
+        except TimeoutException:
+            raise
         except:
             continue
     # enumerate N
@@ -587,6 +589,8 @@ def fix_aromatic(mol, strict=False):
                     fixed = True
                     Chem.SanitizeMol(mol)
                     break
+                except TimeoutException:
+                    raise
                 except:
                     continue
             if fixed:

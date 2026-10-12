@@ -14,6 +14,9 @@ import tempfile
 import contextlib
 import pickle
 import warnings
+import time
+import json
+import hashlib
 
 # Minimal deps: rdkit, meeko, vina, pandas
 from rdkit import Chem
@@ -49,15 +52,25 @@ def _suppress_stdout(func):
     return wrapper
 
 
-def sdf_to_pdbqt(sdf_path, pdbqt_path):
+def sdf_to_pdbqt(sdf_path, pdbqt_path, require_coordinates=False):
     """Convert SDF to PDBQT using RDKit + meeko (no OpenBabel)."""
     mol = Chem.MolFromMolFile(sdf_path, removeHs=False)
     if mol is None:
         raise ValueError(f"Failed to load molecule from {sdf_path}")
     # Ensure 3D and explicit H
     if mol.GetNumConformers() == 0:
+        if require_coordinates:
+            raise ValueError('As-generated score requires an existing conformer; embedding is forbidden')
         AllChem.EmbedMolecule(mol, AllChem.ETKDGv3())
+    original_positions = mol.GetConformer(0).GetPositions().copy()
+    original_atom_count = mol.GetNumAtoms()
     mol = Chem.AddHs(mol, addCoords=True)
+    if require_coordinates:
+        import numpy as np
+        if not np.isfinite(original_positions).all():
+            raise ValueError('Non-finite generated coordinates')
+        if not np.array_equal(mol.GetConformer(0).GetPositions()[:original_atom_count], original_positions):
+            raise ValueError('Ligand preparation changed original generated coordinates')
     preparator = MoleculePreparation()
     setups = preparator.prepare(mol)
     if not setups:
@@ -156,7 +169,7 @@ def dock_one(sdf_path, protein_path, center=None, box_size=None, exhaustiveness=
     lig_pdbqt = prefix + '_lig.pdbqt'
 
     # Ligand: SDF -> PDBQT
-    mol = sdf_to_pdbqt(sdf_path, lig_pdbqt)
+    mol = sdf_to_pdbqt(sdf_path, lig_pdbqt, require_coordinates=(mode == 'score_only'))
     if center is None or box_size is None:
         center, box_size = get_box_from_mol(mol)
 
@@ -173,7 +186,7 @@ def dock_one(sdf_path, protein_path, center=None, box_size=None, exhaustiveness=
             f"Tried: {rec_candidates[0]} and {rec_candidates[1]}"
         )
 
-    v = Vina(sf_name='vina', seed=0, verbosity=0)
+    v = Vina(sf_name='vina', cpu=1 if mode == 'score_only' else 0, seed=0, verbosity=0)
     v.set_receptor(rec_pdbqt)
     v.set_ligand_from_file(lig_pdbqt)
     v.compute_vina_maps(center=center, box_size=box_size)
@@ -524,12 +537,17 @@ def main():
 
     # Pre-prepare receptors once per unique protein to avoid repeated work.
     unique_proteins = sorted({p for _, p in pairs})
+    receptor_tick = time.perf_counter()
+    receptor_records = []
     failed_proteins = set()
     prep_iter = unique_proteins
     if HAS_TQDM:
         prep_iter = tqdm(unique_proteins, desc='Preparing receptors')
     for protein_path in prep_iter:
-        if find_existing_receptor_pdbqt(protein_path, rec_cache_dir=rec_cache):
+        existing = find_existing_receptor_pdbqt(protein_path, rec_cache_dir=rec_cache)
+        if existing:
+            receptor_records.append({'protein_path': protein_path, 'pdbqt_path': existing, 'cache_reused': True,
+                                     'pdbqt_sha256': hashlib.sha256(open(existing, 'rb').read()).hexdigest()})
             continue
         rec_stem = os.path.splitext(os.path.basename(protein_path))[0]
         candidates = [
@@ -539,11 +557,13 @@ def main():
         if any(os.path.exists(c) for c in candidates):
             continue
         try:
-            prepare_receptor_pdbqt(
+            prepared = prepare_receptor_pdbqt(
                 protein_path,
                 os.path.join(rec_cache, rec_stem + '.pdbqt'),
                 work_dir=rec_cache,
             )
+            receptor_records.append({'protein_path': protein_path, 'pdbqt_path': prepared, 'cache_reused': False,
+                                     'pdbqt_sha256': hashlib.sha256(open(prepared, 'rb').read()).hexdigest()})
         except Exception as e:
             failed_proteins.add(protein_path)
             err_msg = str(e).split('\n')[0]
@@ -559,6 +579,8 @@ def main():
             print("No pairs left after receptor preparation filtering")
             return 1
 
+    receptor_seconds = time.perf_counter() - receptor_tick
+    scoring_tick = time.perf_counter()
     if args.n_workers <= 1:
         results = []
         it = pairs
@@ -592,6 +614,12 @@ def main():
     else:
         out_path = os.path.join(args.sdf_dir, 'vina.csv')
     df.to_csv(out_path, index=False)
+    with open(out_path + '.protocol.json', 'w') as stream:
+        json.dump({'mode': args.mode, 'as_generated_coordinates_required': args.mode == 'score_only',
+                   'vina_cpu_per_worker': 1 if args.mode == 'score_only' else 0, 'workers': args.n_workers,
+                   'receptor_preparation_seconds': receptor_seconds,
+                   'ligand_preparation_and_scoring_seconds': time.perf_counter() - scoring_tick,
+                   'prepared_receptors': receptor_records, 'receptor_failures': sorted(failed_proteins)}, stream, indent=2)
     print(f"Saved {len(df)} results to {out_path}")
 
     # Summary (mode-aware valid column)

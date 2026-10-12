@@ -1,0 +1,9 @@
+selection,configured_rounds,round,P_phys_repair,P_phys_damage,P_phys_round_repair,P_phys_round_damage,P_joint_repair,P_joint_damage,P_joint_round_repair,P_joint_round_damage,valid_repair,valid_damage,valid_round_repair,valid_round_damage,complete_repair,complete_damage,complete_round_repair,complete_round_damage,geometry_pass_repair,geometry_pass_damage,geometry_pass_round_repair,geometry_pass_round_damage,energy_pass_repair,energy_pass_damage,energy_pass_round_repair,energy_pass_round_damage,pocket_no_clash_repair,pocket_no_clash_damage,pocket_no_clash_round_repair,pocket_no_clash_round_damage
+confidence,1,1,0,4,0,4,0,1,0,1,0,0,0,0,0,0,0,0,0,2,0,2,1,4,1,4,0,0,0,0
+confidence,3,1,1,3,1,3,0,1,0,1,0,0,0,0,0,1,0,1,0,2,0,2,1,2,1,2,0,0,0,0
+confidence,3,2,1,2,2,1,0,1,0,0,0,1,0,1,0,1,1,1,0,2,2,2,1,2,1,1,0,1,0,1
+confidence,3,3,1,4,0,2,0,1,0,0,0,2,0,1,0,2,0,1,0,3,1,2,1,3,0,1,0,2,0,1
+random,1,1,0,0,0,0,1,0,1,0,0,1,0,1,0,1,0,1,0,3,0,3,0,0,0,0,0,1,0,1
+random,3,1,0,1,0,1,1,0,1,0,0,1,0,1,0,1,0,1,0,2,0,2,0,1,0,1,0,1,0,1
+random,3,2,2,1,3,1,1,1,0,1,0,0,1,0,0,0,1,0,0,2,1,1,3,0,4,0,0,0,1,0
+random,3,3,1,3,0,3,1,1,0,0,0,2,0,2,0,3,0,3,0,4,0,2,2,1,0,2,0,2,0,2

@@ -1,0 +1,9 @@
+"""Evaluate unstarted dev folders; resume original watcher after exclusive handoff."""
+import subprocess
+import sys
+from pathlib import Path
+try:
+    code=subprocess.call([sys.executable,'scripts/evaluate_stage1.py','--root','outputs_test_time_scaling/stage_1/development','--folders_file','outputs_test_time_scaling/stage_1/development/parallel_evaluation_folders.txt'])
+finally:
+    subprocess.run(['ssh','-F','/dev/null','gpu39','kill -CONT 4157712'],check=True)
+raise SystemExit(code)

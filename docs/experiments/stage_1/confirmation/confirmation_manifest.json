@@ -1,0 +1,613 @@
+{
+  "version": 1,
+  "pocket_ids": [
+    "csd_100020",
+    "csd_100021",
+    "csd_100022",
+    "csd_100023",
+    "csd_100024",
+    "csd_100025",
+    "csd_100026",
+    "csd_100027",
+    "csd_100028",
+    "csd_100029",
+    "csd_100030",
+    "csd_100031",
+    "csd_100032",
+    "csd_100033",
+    "csd_100034",
+    "csd_100035",
+    "csd_100036",
+    "csd_100037",
+    "csd_100038",
+    "csd_100039",
+    "csd_100040",
+    "csd_100041",
+    "csd_100042",
+    "csd_100043",
+    "csd_100044",
+    "csd_100045",
+    "csd_100046",
+    "csd_100047",
+    "csd_100048",
+    "csd_100049",
+    "csd_100050",
+    "csd_100051",
+    "csd_100052",
+    "csd_100053",
+    "csd_100054",
+    "csd_100055",
+    "csd_100056",
+    "csd_100057",
+    "csd_100058",
+    "csd_100059",
+    "csd_100060",
+    "csd_100061",
+    "csd_100062",
+    "csd_100063",
+    "csd_100064",
+    "csd_100065",
+    "csd_100066",
+    "csd_100067",
+    "csd_100068",
+    "csd_100069",
+    "csd_100070",
+    "csd_100071",
+    "csd_100072",
+    "csd_100073",
+    "csd_100074",
+    "csd_100075",
+    "csd_100076",
+    "csd_100077",
+    "csd_100078",
+    "csd_100079",
+    "csd_100080",
+    "csd_100081",
+    "csd_100082",
+    "csd_100083",
+    "csd_100084",
+    "csd_100085",
+    "csd_100086",
+    "csd_100087",
+    "csd_100088",
+    "csd_100089",
+    "csd_100090",
+    "csd_100091",
+    "csd_100092",
+    "csd_100093",
+    "csd_100094",
+    "csd_100095",
+    "csd_100096",
+    "csd_100097",
+    "csd_100098",
+    "csd_100099"
+  ],
+  "seeds": [
+    2026,
+    12026,
+    22026,
+    32026,
+    42026
+  ],
+  "budgets": [
+    400,
+    800
+  ],
+  "batch_size": 4,
+  "selected": [
+    {
+      "name": "fk_i50_b5",
+      "family": "fk",
+      "task": {
+        "method": "fk",
+        "particles": 4,
+        "interval": 50,
+        "strength": 5.0,
+        "seed": 2026,
+        "label": "fk_p4_i50_b5_s2026",
+        "budget": 400
+      },
+      "pairs": 60,
+      "pockets": 20,
+      "P_phys_delta": 0.08333333333333333,
+      "P_phys_ci": [
+        0.0,
+        0.16666666666666669
+      ],
+      "P_phys_seed_deltas": {
+        "2026": 0.05,
+        "12026": 0.1,
+        "22026": 0.1
+      },
+      "P_joint_delta": 0.0,
+      "P_joint_ci": [
+        -0.11666666666666665,
+        0.11666666666666667
+      ],
+      "P_joint_seed_deltas": {
+        "2026": -0.1,
+        "12026": 0.0,
+        "22026": 0.1
+      },
+      "valid_delta": 0.0,
+      "valid_ci": [
+        0.0,
+        0.0
+      ],
+      "valid_seed_deltas": {
+        "2026": 0.0,
+        "12026": 0.0,
+        "22026": 0.0
+      },
+      "complete_delta": 0.0,
+      "complete_ci": [
+        0.0,
+        0.0
+      ],
+      "complete_seed_deltas": {
+        "2026": 0.0,
+        "12026": 0.0,
+        "22026": 0.0
+      },
+      "guardrails_ok": true,
+      "min_primary_delta": 0.0
+    },
+    {
+      "name": "partial_confidence",
+      "family": "partial",
+      "task": {
+        "method": "partial",
+        "rounds": 3,
+        "selection": "confidence",
+        "seed": 2026,
+        "label": "partial_confidence_r3_s2026",
+        "budget": 400
+      },
+      "pairs": 60,
+      "pockets": 20,
+      "P_phys_delta": -0.36666666666666664,
+      "P_phys_ci": [
+        -0.5166666666666666,
+        -0.21666666666666665
+      ],
+      "P_phys_seed_deltas": {
+        "2026": -0.4,
+        "12026": -0.45,
+        "22026": -0.25
+      },
+      "P_joint_delta": -0.21666666666666665,
+      "P_joint_ci": [
+        -0.35,
+        -0.09999999999999999
+      ],
+      "P_joint_seed_deltas": {
+        "2026": -0.25,
+        "12026": -0.3,
+        "22026": -0.1
+      },
+      "valid_delta": -0.2333333333333333,
+      "valid_ci": [
+        -0.35,
+        -0.11666666666666667
+      ],
+      "valid_seed_deltas": {
+        "2026": -0.3,
+        "12026": -0.2,
+        "22026": -0.2
+      },
+      "complete_delta": -0.24999999999999994,
+      "complete_ci": [
+        -0.36666666666666664,
+        -0.13333333333333336
+      ],
+      "complete_seed_deltas": {
+        "2026": -0.3,
+        "12026": -0.25,
+        "22026": -0.2
+      },
+      "guardrails_ok": false,
+      "min_primary_delta": -0.36666666666666664
+    }
+  ],
+  "all_development_scores": [
+    {
+      "name": "fk_i20_b2",
+      "family": "fk",
+      "task": {
+        "method": "fk",
+        "particles": 4,
+        "interval": 20,
+        "strength": 2.0,
+        "seed": 2026,
+        "label": "fk_p4_i20_b2_s2026",
+        "budget": 400
+      },
+      "pairs": 60,
+      "pockets": 20,
+      "P_phys_delta": 0.05,
+      "P_phys_ci": [
+        -0.08333333333333334,
+        0.16666666666666669
+      ],
+      "P_phys_seed_deltas": {
+        "2026": 0.1,
+        "12026": 0.0,
+        "22026": 0.05
+      },
+      "P_joint_delta": -0.08333333333333333,
+      "P_joint_ci": [
+        -0.21666666666666665,
+        0.03333333333333334
+      ],
+      "P_joint_seed_deltas": {
+        "2026": 0.0,
+        "12026": 0.05,
+        "22026": -0.3
+      },
+      "valid_delta": 0.0,
+      "valid_ci": [
+        0.0,
+        0.0
+      ],
+      "valid_seed_deltas": {
+        "2026": 0.0,
+        "12026": 0.0,
+        "22026": 0.0
+      },
+      "complete_delta": 0.0,
+      "complete_ci": [
+        0.0,
+        0.0
+      ],
+      "complete_seed_deltas": {
+        "2026": 0.0,
+        "12026": 0.0,
+        "22026": 0.0
+      },
+      "guardrails_ok": true,
+      "min_primary_delta": -0.08333333333333333
+    },
+    {
+      "name": "fk_i20_b5",
+      "family": "fk",
+      "task": {
+        "method": "fk",
+        "particles": 4,
+        "interval": 20,
+        "strength": 5.0,
+        "seed": 2026,
+        "label": "fk_p4_i20_b5_s2026",
+        "budget": 400
+      },
+      "pairs": 60,
+      "pockets": 20,
+      "P_phys_delta": 0.033333333333333326,
+      "P_phys_ci": [
+        -0.08333333333333333,
+        0.13333333333333336
+      ],
+      "P_phys_seed_deltas": {
+        "2026": 0.05,
+        "12026": 0.05,
+        "22026": 0.0
+      },
+      "P_joint_delta": -0.08333333333333333,
+      "P_joint_ci": [
+        -0.2333333333333333,
+        0.05
+      ],
+      "P_joint_seed_deltas": {
+        "2026": -0.05,
+        "12026": 0.0,
+        "22026": -0.2
+      },
+      "valid_delta": 0.0,
+      "valid_ci": [
+        0.0,
+        0.0
+      ],
+      "valid_seed_deltas": {
+        "2026": 0.0,
+        "12026": 0.0,
+        "22026": 0.0
+      },
+      "complete_delta": 0.0,
+      "complete_ci": [
+        0.0,
+        0.0
+      ],
+      "complete_seed_deltas": {
+        "2026": 0.0,
+        "12026": 0.0,
+        "22026": 0.0
+      },
+      "guardrails_ok": true,
+      "min_primary_delta": -0.08333333333333333
+    },
+    {
+      "name": "fk_i50_b2",
+      "family": "fk",
+      "task": {
+        "method": "fk",
+        "particles": 4,
+        "interval": 50,
+        "strength": 2.0,
+        "seed": 2026,
+        "label": "fk_p4_i50_b2_s2026",
+        "budget": 400
+      },
+      "pairs": 60,
+      "pockets": 20,
+      "P_phys_delta": 0.08333333333333333,
+      "P_phys_ci": [
+        -0.016666666666666666,
+        0.18333333333333335
+      ],
+      "P_phys_seed_deltas": {
+        "2026": 0.15,
+        "12026": 0.0,
+        "22026": 0.1
+      },
+      "P_joint_delta": -0.01666666666666667,
+      "P_joint_ci": [
+        -0.18333333333333335,
+        0.15
+      ],
+      "P_joint_seed_deltas": {
+        "2026": -0.1,
+        "12026": -0.1,
+        "22026": 0.15
+      },
+      "valid_delta": 0.0,
+      "valid_ci": [
+        0.0,
+        0.0
+      ],
+      "valid_seed_deltas": {
+        "2026": 0.0,
+        "12026": 0.0,
+        "22026": 0.0
+      },
+      "complete_delta": 0.0,
+      "complete_ci": [
+        0.0,
+        0.0
+      ],
+      "complete_seed_deltas": {
+        "2026": 0.0,
+        "12026": 0.0,
+        "22026": 0.0
+      },
+      "guardrails_ok": true,
+      "min_primary_delta": -0.01666666666666667
+    },
+    {
+      "name": "fk_i50_b5",
+      "family": "fk",
+      "task": {
+        "method": "fk",
+        "particles": 4,
+        "interval": 50,
+        "strength": 5.0,
+        "seed": 2026,
+        "label": "fk_p4_i50_b5_s2026",
+        "budget": 400
+      },
+      "pairs": 60,
+      "pockets": 20,
+      "P_phys_delta": 0.08333333333333333,
+      "P_phys_ci": [
+        0.0,
+        0.16666666666666669
+      ],
+      "P_phys_seed_deltas": {
+        "2026": 0.05,
+        "12026": 0.1,
+        "22026": 0.1
+      },
+      "P_joint_delta": 0.0,
+      "P_joint_ci": [
+        -0.11666666666666665,
+        0.11666666666666667
+      ],
+      "P_joint_seed_deltas": {
+        "2026": -0.1,
+        "12026": 0.0,
+        "22026": 0.1
+      },
+      "valid_delta": 0.0,
+      "valid_ci": [
+        0.0,
+        0.0
+      ],
+      "valid_seed_deltas": {
+        "2026": 0.0,
+        "12026": 0.0,
+        "22026": 0.0
+      },
+      "complete_delta": 0.0,
+      "complete_ci": [
+        0.0,
+        0.0
+      ],
+      "complete_seed_deltas": {
+        "2026": 0.0,
+        "12026": 0.0,
+        "22026": 0.0
+      },
+      "guardrails_ok": true,
+      "min_primary_delta": 0.0
+    },
+    {
+      "name": "partial_random",
+      "family": "partial",
+      "task": {
+        "method": "partial",
+        "rounds": 3,
+        "selection": "random",
+        "seed": 2026,
+        "label": "partial_random_r3_s2026",
+        "budget": 400
+      },
+      "pairs": 60,
+      "pockets": 20,
+      "P_phys_delta": -0.4000000000000001,
+      "P_phys_ci": [
+        -0.5666666666666667,
+        -0.23333333333333334
+      ],
+      "P_phys_seed_deltas": {
+        "2026": -0.4,
+        "12026": -0.4,
+        "22026": -0.4
+      },
+      "P_joint_delta": -0.24999999999999994,
+      "P_joint_ci": [
+        -0.4333333333333333,
+        -0.09999999999999999
+      ],
+      "P_joint_seed_deltas": {
+        "2026": -0.25,
+        "12026": -0.25,
+        "22026": -0.25
+      },
+      "valid_delta": -0.18333333333333332,
+      "valid_ci": [
+        -0.26666666666666666,
+        -0.09999999999999999
+      ],
+      "valid_seed_deltas": {
+        "2026": -0.05,
+        "12026": -0.25,
+        "22026": -0.25
+      },
+      "complete_delta": -0.25,
+      "complete_ci": [
+        -0.36666666666666664,
+        -0.14999999999999997
+      ],
+      "complete_seed_deltas": {
+        "2026": -0.1,
+        "12026": -0.4,
+        "22026": -0.25
+      },
+      "guardrails_ok": false,
+      "min_primary_delta": -0.4000000000000001
+    },
+    {
+      "name": "partial_confidence",
+      "family": "partial",
+      "task": {
+        "method": "partial",
+        "rounds": 3,
+        "selection": "confidence",
+        "seed": 2026,
+        "label": "partial_confidence_r3_s2026",
+        "budget": 400
+      },
+      "pairs": 60,
+      "pockets": 20,
+      "P_phys_delta": -0.36666666666666664,
+      "P_phys_ci": [
+        -0.5166666666666666,
+        -0.21666666666666665
+      ],
+      "P_phys_seed_deltas": {
+        "2026": -0.4,
+        "12026": -0.45,
+        "22026": -0.25
+      },
+      "P_joint_delta": -0.21666666666666665,
+      "P_joint_ci": [
+        -0.35,
+        -0.09999999999999999
+      ],
+      "P_joint_seed_deltas": {
+        "2026": -0.25,
+        "12026": -0.3,
+        "22026": -0.1
+      },
+      "valid_delta": -0.2333333333333333,
+      "valid_ci": [
+        -0.35,
+        -0.11666666666666667
+      ],
+      "valid_seed_deltas": {
+        "2026": -0.3,
+        "12026": -0.2,
+        "22026": -0.2
+      },
+      "complete_delta": -0.24999999999999994,
+      "complete_ci": [
+        -0.36666666666666664,
+        -0.13333333333333336
+      ],
+      "complete_seed_deltas": {
+        "2026": -0.3,
+        "12026": -0.25,
+        "22026": -0.2
+      },
+      "guardrails_ok": false,
+      "min_primary_delta": -0.36666666666666664
+    }
+  ],
+  "selection_rule": "one per family; guardrails, max minimum co-primary delta at B400, joint, physical, deterministic name tie-break",
+  "selection_uses_confirmation_data": false,
+  "bootstrap_resamples": 5000,
+  "code_sha256": {
+    "models/sample.py": "44ad2834c2208a2ee4253238d2a41da31d10e6f7b98961dafcd4a114a400ee79",
+    "scripts/stage1_runtime.py": "877a23376faa78251639733fa353bc74bcadb108bd5bc5bb0954415a364e2052",
+    "scripts/fk_particles.py": "28877079d97c76d5c9a1af1ba31e4b79c95f0568b6b2c984637631d259d7f655",
+    "scripts/partial_refinement.py": "5ff3ca2645a0e663848b54bd690ee6c421acc685ea40fbd4f687f2200d285eac",
+    "scripts/sample_fk_particles.py": "c99f729a442bd055f4d4b433817f93d15e2c279633e10ef35251375ee8de36d0",
+    "scripts/sample_partial_refinement.py": "b18c2a7967c98828969bfbf38a58e803af5f02bfcd18975801e10064c6ba88e0"
+  },
+  "partial_noise_start": 1.0,
+  "partial_fraction": 0.25,
+  "partial_rounds_by_budget": {
+    "400": 3,
+    "800": 7
+  },
+  "fk_particles_by_budget": {
+    "400": 4,
+    "800": 8
+  },
+  "negative_development_policy": "Complete full predefined confirmation for both chosen families; no further reward or selector tuning",
+  "frozen_development_extensions": {
+    "pocket_ids": [
+      "csd_100000",
+      "csd_100001",
+      "csd_100002",
+      "csd_100003",
+      "csd_100004",
+      "csd_100005",
+      "csd_100006",
+      "csd_100007",
+      "csd_100008",
+      "csd_100009",
+      "csd_100010",
+      "csd_100011",
+      "csd_100012",
+      "csd_100013",
+      "csd_100014",
+      "csd_100015",
+      "csd_100016",
+      "csd_100017",
+      "csd_100018",
+      "csd_100019"
+    ],
+    "purpose": "Complete selected-method full100/five-seed summaries after configuration freeze; never use extension outcomes to retune",
+    "seeds": [
+      2026,
+      12026,
+      22026,
+      32026,
+      42026
+    ],
+    "budgets": [
+      400,
+      800
+    ],
+    "reuse": "Reuse exactly matching completed development tasks; only generate missing method/budget/seed cells"
+  }
+}

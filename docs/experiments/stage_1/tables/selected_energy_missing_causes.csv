@@ -1,0 +1,8 @@
+method,budget,energy_missing_cause,planned_outputs
+fk_i50_b5,400,ensemble_or_generated_conformer_energy_unavailable,4
+fk_i50_b5,800,ensemble_or_generated_conformer_energy_unavailable,3
+geometry_confidence,400,ensemble_or_generated_conformer_energy_unavailable,1
+partial_confidence,400,ensemble_or_generated_conformer_energy_unavailable,4
+partial_confidence,400,invalid input,56
+partial_confidence,800,ensemble_or_generated_conformer_energy_unavailable,1
+partial_confidence,800,invalid input,62

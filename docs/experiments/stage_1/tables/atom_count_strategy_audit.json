@@ -1,0 +1,307 @@
+{
+  "complete": true,
+  "runs": 38,
+  "records": [
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p4_i20_b5_s12026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s12026",
+      "same_atom_count_prior": true,
+      "particles": 4,
+      "pockets_with_multiple_output_atom_counts": 11,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p4_i20_b5_s2026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s2026_retry1",
+      "same_atom_count_prior": true,
+      "particles": 4,
+      "pockets_with_multiple_output_atom_counts": 7,
+      "known_atom_count_coverage": 0.95
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p4_i50_b5_s12026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s12026",
+      "same_atom_count_prior": true,
+      "particles": 4,
+      "pockets_with_multiple_output_atom_counts": 20,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p4_i20_b2_s12026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s12026",
+      "same_atom_count_prior": true,
+      "particles": 4,
+      "pockets_with_multiple_output_atom_counts": 8,
+      "known_atom_count_coverage": 0.9125
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p8_i20_b5_s2026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s2026_retry1",
+      "same_atom_count_prior": true,
+      "particles": 8,
+      "pockets_with_multiple_output_atom_counts": 19,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p4_i20_b5_s22026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s22026",
+      "same_atom_count_prior": true,
+      "particles": 4,
+      "pockets_with_multiple_output_atom_counts": 10,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p4_i50_b2_s12026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s12026",
+      "same_atom_count_prior": true,
+      "particles": 4,
+      "pockets_with_multiple_output_atom_counts": 20,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p8_i20_b5_s22026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s22026",
+      "same_atom_count_prior": true,
+      "particles": 8,
+      "pockets_with_multiple_output_atom_counts": 18,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p4_i20_b2_s2026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s2026_retry1",
+      "same_atom_count_prior": true,
+      "particles": 4,
+      "pockets_with_multiple_output_atom_counts": 5,
+      "known_atom_count_coverage": 0.9375
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p8_i20_b2_s2026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s2026_retry1",
+      "same_atom_count_prior": true,
+      "particles": 8,
+      "pockets_with_multiple_output_atom_counts": 19,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p8_i50_b2_s12026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s12026",
+      "same_atom_count_prior": true,
+      "particles": 8,
+      "pockets_with_multiple_output_atom_counts": 20,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p8_i20_b5_s12026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s12026",
+      "same_atom_count_prior": true,
+      "particles": 8,
+      "pockets_with_multiple_output_atom_counts": 18,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p8_i20_b2_s22026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s22026",
+      "same_atom_count_prior": true,
+      "particles": 8,
+      "pockets_with_multiple_output_atom_counts": 20,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p8_i50_b5_s2026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s2026_retry1",
+      "same_atom_count_prior": true,
+      "particles": 8,
+      "pockets_with_multiple_output_atom_counts": 20,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p4_i50_b2_s22026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s22026",
+      "same_atom_count_prior": true,
+      "particles": 4,
+      "pockets_with_multiple_output_atom_counts": 20,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p4_i50_b5_s22026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s22026",
+      "same_atom_count_prior": true,
+      "particles": 4,
+      "pockets_with_multiple_output_atom_counts": 20,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p4_i20_b2_s22026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s22026",
+      "same_atom_count_prior": true,
+      "particles": 4,
+      "pockets_with_multiple_output_atom_counts": 10,
+      "known_atom_count_coverage": 0.8875
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p4_i50_b5_s2026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s2026_retry1",
+      "same_atom_count_prior": true,
+      "particles": 4,
+      "pockets_with_multiple_output_atom_counts": 17,
+      "known_atom_count_coverage": 0.9375
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p8_i50_b5_s12026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s12026",
+      "same_atom_count_prior": true,
+      "particles": 8,
+      "pockets_with_multiple_output_atom_counts": 20,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p4_i50_b2_s2026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s2026_retry1",
+      "same_atom_count_prior": true,
+      "particles": 4,
+      "pockets_with_multiple_output_atom_counts": 17,
+      "known_atom_count_coverage": 0.925
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p8_i50_b2_s22026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s22026",
+      "same_atom_count_prior": true,
+      "particles": 8,
+      "pockets_with_multiple_output_atom_counts": 20,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p8_i20_b2_s12026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s12026",
+      "same_atom_count_prior": true,
+      "particles": 8,
+      "pockets_with_multiple_output_atom_counts": 18,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p8_i50_b5_s22026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s22026",
+      "same_atom_count_prior": true,
+      "particles": 8,
+      "pockets_with_multiple_output_atom_counts": 20,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development/fk_p8_i50_b2_s2026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s2026_retry1",
+      "same_atom_count_prior": true,
+      "particles": 8,
+      "pockets_with_multiple_output_atom_counts": 20,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b400_s32026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s32026",
+      "same_atom_count_prior": true,
+      "particles": 4,
+      "pockets_with_multiple_output_atom_counts": 79,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b800_s42026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s42026",
+      "same_atom_count_prior": true,
+      "particles": 8,
+      "pockets_with_multiple_output_atom_counts": 80,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b800_s12026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s12026",
+      "same_atom_count_prior": true,
+      "particles": 8,
+      "pockets_with_multiple_output_atom_counts": 80,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b800_s32026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s32026",
+      "same_atom_count_prior": true,
+      "particles": 8,
+      "pockets_with_multiple_output_atom_counts": 80,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b400_s42026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s42026",
+      "same_atom_count_prior": true,
+      "particles": 4,
+      "pockets_with_multiple_output_atom_counts": 80,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b400_s2026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s2026_retry1",
+      "same_atom_count_prior": true,
+      "particles": 4,
+      "pockets_with_multiple_output_atom_counts": 77,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b400_s12026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s12026",
+      "same_atom_count_prior": true,
+      "particles": 4,
+      "pockets_with_multiple_output_atom_counts": 77,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b800_s22026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s22026",
+      "same_atom_count_prior": true,
+      "particles": 8,
+      "pockets_with_multiple_output_atom_counts": 80,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b400_s22026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s22026",
+      "same_atom_count_prior": true,
+      "particles": 4,
+      "pockets_with_multiple_output_atom_counts": 79,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/confirmation/fk_i50_b5_b800_s2026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s2026_retry1",
+      "same_atom_count_prior": true,
+      "particles": 8,
+      "pockets_with_multiple_output_atom_counts": 80,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_extensions/fk_i50_b5_b800_s32026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s32026",
+      "same_atom_count_prior": true,
+      "particles": 8,
+      "pockets_with_multiple_output_atom_counts": 20,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_extensions/fk_i50_b5_b400_s42026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s42026",
+      "same_atom_count_prior": true,
+      "particles": 4
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_extensions/fk_i50_b5_b800_s42026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s42026",
+      "same_atom_count_prior": true,
+      "particles": 8,
+      "pockets_with_multiple_output_atom_counts": 20,
+      "known_atom_count_coverage": 1.0
+    },
+    {
+      "run": "outputs_test_time_scaling/stage_1/development_extensions/fk_i50_b5_b400_s32026",
+      "baseline": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s32026",
+      "same_atom_count_prior": true,
+      "particles": 4
+    }
+  ],
+  "scope": "All generated FK cells use identical pocket-based variable-size prior as corresponding independent pool. Whole-graph resampling permits heterogeneous sizes; no fixed-size-only FK constraint."
+}

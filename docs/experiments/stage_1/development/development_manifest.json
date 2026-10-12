@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "pocket_ids": [
+    "csd_100000",
+    "csd_100001",
+    "csd_100002",
+    "csd_100003",
+    "csd_100004",
+    "csd_100005",
+    "csd_100006",
+    "csd_100007",
+    "csd_100008",
+    "csd_100009",
+    "csd_100010",
+    "csd_100011",
+    "csd_100012",
+    "csd_100013",
+    "csd_100014",
+    "csd_100015",
+    "csd_100016",
+    "csd_100017",
+    "csd_100018",
+    "csd_100019"
+  ],
+  "seeds": [
+    2026,
+    12026,
+    22026
+  ],
+  "batch_size": 4,
+  "fk": {
+    "particles": [
+      4,
+      8
+    ],
+    "intervals": [
+      20,
+      50
+    ],
+    "strengths": [
+      2,
+      5
+    ],
+    "steps": 100,
+    "reward": "negative normalized clean prediction bond distance [0.8,2.0], nonbond <0.8, pocket <1.4 soft penalties",
+    "resampling": "multinomial; differential potential; copy graph and reward/confidence histories",
+    "all_failed": "uniform",
+    "final_selector": "geometry_confidence Best-of-P; energy/Vina excluded",
+    "atom_sizes": "variable per particle; no forced fixed size"
+  },
+  "partial": {
+    "selection": [
+      "random",
+      "confidence_pos"
+    ],
+    "fraction": 0.25,
+    "rounds": [
+      1,
+      3
+    ],
+    "noise_start": 1.0,
+    "return_steps": 100,
+    "teacher_path": "maskfill, ar transform, part1_pert=fixed",
+    "updates": "selected positions/types; all incident edges including cross-region",
+    "context": "exact per-step assertion for unselected types/coordinates/internal bonds and pocket"
+  },
+  "maximum_configurations_to_confirm": 2,
+  "code_sha256": {
+    "scripts/fk_particles.py": "28877079d97c76d5c9a1af1ba31e4b79c95f0568b6b2c984637631d259d7f655",
+    "scripts/sample_fk_particles.py": "a9c5d1788572aee75eeb53fd1eb56ddb6035315dc47b25ccaf9070d237f2e1c8",
+    "scripts/partial_refinement.py": "0e0bb62db9f9dddd2ddf656b23e8ba7e2995a2f909963374f80cf2b61e4c7bcd",
+    "scripts/sample_partial_refinement.py": "66cc9d6f2885e2f9f5381028be1e51d42511029ced599e0d4d71daa0cfd3e363",
+    "scripts/run_stage1_adaptations.py": "b581bb17daa7c86e92518c751d3b616e69aa32b4aea13bfb666e0bc8cc480b58"
+  }
+}

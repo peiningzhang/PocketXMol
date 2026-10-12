@@ -1,0 +1,7 @@
+{
+  "complete": true,
+  "scope": "80 confirmation pockets, five seeds; frozen FK and exact independent prefixes P4/P8; all planned candidates retained",
+  "bootstrap_resamples": 5000,
+  "cluster": "pocket after seed average",
+  "conditional_metric_note": "Duplicate/fingerprint values condition on chemically valid candidates. Undefined values remain NaN; defined pairs/pockets reported separately. Energy availability is not used."
+}

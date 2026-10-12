@@ -1,0 +1,13 @@
+subset,outcome,mean_within_pool_spearman,pools_with_defined_correlation
+development,P_phys,0.10571560701332117,492
+development,P_joint,0.21743239040129012,354
+development,vina_score,-0.24252743276974412,650
+development,energy_ratio,-0.14013138792102206,656
+confirmation,P_phys,0.09497320378317957,905
+confirmation,P_joint,0.2949112869562433,552
+confirmation,vina_score,-0.3616358684803288,1104
+confirmation,energy_ratio,-0.1910510402991606,1197
+all,P_phys,0.09875649826365893,1397
+all,P_joint,0.26463807571953973,906
+all,vina_score,-0.31749648238461614,1754
+all,energy_ratio,-0.17302443913345153,1853

@@ -1,0 +1,15 @@
+{
+  "hardware_identical": true,
+  "paired_trials": 36,
+  "methods": [
+    "fk_i50_b5",
+    "geometry_confidence",
+    "more_steps",
+    "native_refinement",
+    "partial_confidence",
+    "vina_oracle"
+  ],
+  "scope": "prototype batch4 search throughput",
+  "confidence_histories_retained": true,
+  "interpretation": "Empirical full recording on/off costs, not a pure causal estimate of recording overhead: GPU generation is not bitwise deterministic, reconstruction cost varies and native refinement can stop early. Actual NFE and matched fraction must be inspected."
+}

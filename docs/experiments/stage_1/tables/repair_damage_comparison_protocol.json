@@ -1,0 +1,6 @@
+{
+  "cumulative": "metric_initial is round0 vs metric_final at round r",
+  "adjacent": "metric_previous is round r-1 vs metric_final at round r; *_round_repair/damage aligns with consecutive-state atomic attribution",
+  "diagnostic_subset": "first four saved development pockets per run; descriptive, not full100 inference",
+  "configured_rounds_grouped_separately": true
+}

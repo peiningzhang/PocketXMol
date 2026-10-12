@@ -1,0 +1,171 @@
+{
+  "status": "complete",
+  "reviewed_at": 1791769289.5079448,
+  "requirements": [
+    {
+      "id": "protocol",
+      "status": "verified",
+      "requirement": "100 IDs, development20/confirmation80, five seeds, metrics/thresholds/rankers/failed denominators frozen",
+      "authoritative_evidence": "protocol.json; pocket_ids.txt; development_ids.txt; confirmation_ids.txt",
+      "verification": "All 100 IDs are disjointly partitioned 20/80, five seeds and P_phys/P_joint, ranking, failures and bootstrap rules frozen. protocol.plan_sha256 matches plan.md."
+    },
+    {
+      "id": "checkpoint",
+      "status": "verified",
+      "requirement": "Original teacher checkpoint unchanged; configs, code, environments, GPU and batch size recorded",
+      "authoritative_evidence": "completion_audit.json; source_snapshot_final_completion/manifest.json; environment/; */run.json",
+      "verification": "Automated audit matched checkpoint SHA to current teacher; all six frozen sampler source hashes match; runtime files record node, GPU, batch and configs; consolidated 60-file code snapshot verified."
+    },
+    {
+      "id": "core_matrix",
+      "status": "verified",
+      "requirement": "All 40 baseline generation tasks complete; 7000 planned candidates; actual calls recorded; NFE around1.8M with native early stopping reported",
+      "authoritative_evidence": "generation_ledger.json; progress_all_tasks.csv; */DONE; */gen_info.csv; */run.json",
+      "verification": "40/40 tasks and all 7000 candidate rows present; direct sum of every gen_info.nfe is 1,783,600, including native early stopping."
+    },
+    {
+      "id": "core_evaluation",
+      "status": "verified",
+      "requirement": "All core candidates independently scored for five geometry checks, pocket clashes, energy50/100/seed42, as-generated Vina; missing causes retained",
+      "authoritative_evidence": "completion_audit.json core task issues=[]; */EVALUATED; candidate_metrics.csv; energy_candidates.csv; vina.csv",
+      "verification": "All candidate identities have geometry/clash, energy (50 conformers, ratio100, seed42, one thread) and as-generated Vina results or retained failure causes; missing selected-output energy causes are tabulated."
+    },
+    {
+      "id": "nested_pools",
+      "status": "verified",
+      "requirement": "Exact same raw pool prefixes N1/2/4/8; no duplicate streams or budget-changing replacement; source/checkpoint/cache provenance verified",
+      "authoritative_evidence": "nested_pool_audit.json; native_actual_nfe_matched_protocol.json; tables/native_actual_nfe_matched_comparisons.csv",
+      "verification": "Raw nested N1/2/4/8 prefixes and selected SDF hashes match across five seeds. Separate retrospective comparison retains all 1500 native outputs and exactly pairs actual graph NFE."
+    },
+    {
+      "id": "development",
+      "status": "verified",
+      "requirement": "Two bounded families, original20 pockets/three seeds, FK8 configurations and partial4 configurations; full state/context invariants, weights/ESS/ancestors/diversity",
+      "authoritative_evidence": "development/development_manifest.json; development/adaptation_ledger.json; state_preservation_audit.json; tables/fk_ancestor_ess_summary.csv",
+      "verification": "Both bounded families completed. All 67 formal FK/v2 partial runs and 7,380 diagnostic events pass pocket/state, event, weight and ESS audit; old partial v1 remains diagnostic."
+    },
+    {
+      "id": "confirmation_freeze",
+      "status": "verified",
+      "requirement": "At most2 configs selected only from development; immutable criteria/parameters/code before confirmation",
+      "authoritative_evidence": "confirmation/confirmation_manifest.json; completion_audit.json",
+      "verification": "Two configurations selected by the frozen development rule before confirmation; six sampler implementation hashes unchanged."
+    },
+    {
+      "id": "confirmation",
+      "status": "verified",
+      "requirement": "Chosen configs at B400 and adjacent800 on confirmation80/five seeds; corresponding baseline reuse; no further reward tuning",
+      "authoritative_evidence": "confirmation/confirmation_ledger.json; confirmation/EVALUATION_COMPLETE; confirmation/*/EVALUATED",
+      "verification": "Both frozen families evaluated on 80 held-out-within-protocol pockets, five seeds, B400/B800; all planned candidate grids and energy/Vina coverage complete."
+    },
+    {
+      "id": "full100",
+      "status": "verified",
+      "requirement": "Development/confirmation reported separately and full100 summaries; fill frozen selected-method development cells to allfive seeds without retuning",
+      "authoritative_evidence": "development_extensions/generation_audit.json; development_extensions/EVALUATION_COMPLETE; tables/budget_curves.csv",
+      "verification": "Selected configurations have full 20 development pockets and five seeds; development, confirmation and full100 results are reported separately."
+    },
+    {
+      "id": "paired_statistics",
+      "status": "verified",
+      "requirement": "Seed means within pocket, paired deltas and pocket-cluster bootstrap95CI >=5000; all planned failures retained",
+      "authoritative_evidence": "tables/per_pocket_seed_selections.csv; tables/paired_comparisons.csv; tables/paired_budget_differences.csv; tables/analysis.json",
+      "verification": "Pocket is the resampling unit after seed averaging; all formal matrices complete with 5,000 resamples and failures retained."
+    },
+    {
+      "id": "coverage_selection",
+      "status": "verified",
+      "requirement": "Confidence, geometry, Vina and random comparisons; candidate oracle/gap; confidence correlation/reliability; -6/-8 sensitivity",
+      "authoritative_evidence": "tables/pool_oracle.csv; tables/oracle_gap.csv; tables/confidence_correlations.csv; tables/confidence_reliability.csv; tables/budget_curves.csv",
+      "verification": "Random/confidence/geometry/Vina comparisons, oracle ceilings/gaps, confidence diagnostics, and Vina -6/-8 sensitivity are present. Report flags Vina-oracle as target leakage."
+    },
+    {
+      "id": "physical_failure_analysis",
+      "status": "verified",
+      "requirement": "Geometry components, energy distributions/coverage/causes, pocket and heavyatom-normalized clashes, valence/aromatic/reconstruction counts; complete-conditional checks",
+      "authoritative_evidence": "tables/component_failures.csv; tables/chemical_failure_counts.csv; tables/all_candidates.csv; tables/selected_energy_missing_causes.csv",
+      "verification": "Five geometry checks, energy, pocket clashes and heavy-atom normalization, chemical failures, warnings and missing causes are retained, including conditional-on-complete measures."
+    },
+    {
+      "id": "diversity_size",
+      "status": "verified",
+      "requirement": "QED, molecule sizes, ligand efficiency, SMILES/scaffolds and withinpool fingerprints/duplicates; selected-method guardrail/stratified analyses",
+      "authoritative_evidence": "tables/pool_diversity.csv; tables/size_stratified_quality.csv; tables/selected_pool_guardrails_comparisons.csv; tables/fk_physical_batch_audit.json",
+      "verification": "QED, size, ligand efficiency, structures, duplicate/fingerprint diversity and coverage reported. Exact selected FK pool comparisons retain all 80x5 paired plans; candidate size shift is disclosed. P8 forwards are physically chunked at batch4 and verified in 26 runs."
+    },
+    {
+      "id": "timing",
+      "status": "verified",
+      "requirement": "Actual NFE, total generation incl reconstruction/data/I/O, selector and verifier costs; startup/warmup/receptor prep independent; repeated samebatch/hardware timing",
+      "authoritative_evidence": "tables/repeated_timing_summary.csv; tables/trace_control_repeated_timing_summary.csv; tables/controlled_cost_quality_points.csv; figures/confirmation_controlled_time_curves.pdf",
+      "verification": "Both timing modes have 3 repeats on the same A100 and batch4; startup/warmup, data/reconstruction, selector, geometry/Vina verifier and NFE scope recorded. Throughput is labeled amortized; energy remains evaluation cost."
+    },
+    {
+      "id": "repair_damage",
+      "status": "verified",
+      "requirement": "Saved successful repair and introduced-error examples, atom/coordinate/bond attribution; exact context/pocket preservation verified",
+      "authoritative_evidence": "tables/repair_damage_with_attribution_v2.csv; tables/repair_state_attribution_v2.csv; repair_examples.md; state_preservation_audit.json",
+      "verification": "Successful and damaged transitions are attributed across atoms, positions and bonds. Fixed context/pocket assertions passed; reconstructed chemistry is distinguished from raw state."
+    },
+    {
+      "id": "figures",
+      "status": "verified",
+      "requirement": "Pphys/Pjoint against actual NFE and total search time with paired CIs; component failures",
+      "authoritative_evidence": "figures/all_nfe_curves.pdf; figures/all_time_curves.pdf; figures/confirmation_controlled_time_curves.pdf; figures/confirmation_component_pass.pdf",
+      "verification": "Rendered all four final PNG/PDF views; manually inspected actual-NFE, amortized time, controlled confirmation cost/quality and component heatmap. Axes and error bars identify their statistic/scope."
+    },
+    {
+      "id": "resource_recovery",
+      "status": "verified",
+      "requirement": "SSH GPU execution, aggregate<=48 charged GPUhours, independent logs, valid done/retry recovery, no raw deletion; outputsize policy",
+      "authoritative_evidence": "progress.csv; progress_all_tasks.csv; progress.md; retry_reproducibility.json; progress_snapshot.json; evaluation_scheduler.json; generation_ledger.json",
+      "verification": "SSH GPU execution documented; all scheduler queues terminal; no stage1 sampler/evaluator processes remain on gpu29/35/39. Conservative charge 15.796 GPU-hours; output tree 119,774,046 bytes; failed/abandoned raw outputs retained."
+    },
+    {
+      "id": "report",
+      "status": "verified",
+      "requirement": "Final report, boundaries and negative findings, stage2 criteria1/2/3 and guardrails audited; minimal validation if evidence insufficient",
+      "authoritative_evidence": "report.md; method_notes.md; method_references.md; tables/stage2_quantitative_gates.json",
+      "verification": "Final report covers boundaries, negative findings, size/coverage/diversity, Stage2 gates 1/2/3 and a minimum validation proposal. Quantitative criteria 1 and 2 fail; criterion 3 has no supported mechanism/control; no Stage2 expansion."
+    },
+    {
+      "id": "conditional_n16",
+      "status": "verified",
+      "requirement": "Inspect B800 vsB400 deployed-method trend. If a clear positive trend warrants N16/B1600, use a small predefined subset with corresponding1600-step/native-refinement controls; otherwise record no expansion rationale.",
+      "authoritative_evidence": "tables/paired_budget_differences.csv; tables/n16_decision.json; report.md",
+      "verification": "Complete B400/B800 rule: geometry P_phys +1.4pp [\u22121.4,+4.4], P_joint +2.0pp [\u22120.8,+4.8]. No positive CI lower bound, so preregistered small N16 extension is correctly not triggered; reason recorded."
+    }
+  ],
+  "automated_audit": {
+    "path": "completion_audit.json",
+    "passed": 27,
+    "total": 27
+  },
+  "statistics": {
+    "complete": true,
+    "bootstrap_resamples": 5000
+  },
+  "external_process_review": {
+    "nodes": [
+      "gpu29",
+      "gpu35",
+      "gpu39"
+    ],
+    "project_generation_and_evaluation_processes_remaining": 0
+  },
+  "plan_sha256": "cdfec9f671971ac3842a219da331a8d70c77a903ebd6645d464f7225a2bb0b00",
+  "artifacts_sha256": {
+    "report.md": "99c692453b010d12313601272b3c50c7fcd24b55e4724f3732d84644c7132f03",
+    "completion_audit.json": "955e90dd08b1172570d6df952b12f75fc2df8393a99a128b07cb953e8fca7fe2",
+    "figures/all_nfe_curves.pdf": "4bd8e10d9af408ade7e5be52c13d5798c4b4b7a4de2c86ff2025dd28874cc20f",
+    "figures/all_time_curves.pdf": "13068f64d73a4ebf1d790056911e13bab2b41a84f5b947369c85b88906da0d74",
+    "figures/confirmation_controlled_time_curves.pdf": "c4152df8a081a451064619e9ee55439025ee492531ab1659a5987ee8a9817a09",
+    "figures/confirmation_component_pass.pdf": "b5c0fbcf7f473df13713d9786960fd6bf940492c60c4fe582470f23269948012",
+    "tables/per_pocket_seed_selections.csv": "86e68c5bf50c496e2ad65ce475665ba5d555f7e35a0b2522538a15cb341f1286",
+    "tables/paired_comparisons.csv": "9dfcf7fbfb8dacdd2f901990db8d1f0b93a8c0307bcefe335fba8f7bc9513417",
+    "tables/selected_pool_guardrails_comparisons.csv": "fe89c57c9f333cff61c14575cee2bca1ee6bc76b45d85c06590d3314511f7e86",
+    "tables/stage2_quantitative_gates.json": "d43775e31dd756bbec5044101b9288e2908597fb072819e2af5535e169266ac2",
+    "tables/n16_decision.json": "3178dec417bd42f3da90f6bec0a77d98c8fb458baf1626bf4b61edf6af093ca3",
+    "source_snapshot_final_completion/manifest.json": "9597ade06c3dc9a779bbecc1432d27658909259bf7833f2aee59690b91b1cc62"
+  }
+}

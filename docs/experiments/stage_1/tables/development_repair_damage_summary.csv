@@ -1,0 +1,2 @@
+selection,round,P_phys_repair,P_phys_damage,P_joint_repair,P_joint_damage,valid_repair,valid_damage,complete_repair,complete_damage,geometry_pass_repair,geometry_pass_damage,energy_pass_repair,energy_pass_damage,pocket_no_clash_repair,pocket_no_clash_damage
+confidence,1,0,1,0,0,0,1,0,1,0,1,0,1,0,1

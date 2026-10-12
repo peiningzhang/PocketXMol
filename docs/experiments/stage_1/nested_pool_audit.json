@@ -1,0 +1,350 @@
+{
+  "complete": true,
+  "records": [
+    {
+      "seed": 2026,
+      "status": "verified",
+      "raw_prefix_candidates": 400,
+      "merged_candidates": 800,
+      "selections": [
+        {
+          "label": "best_of_1_random",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_1_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_1_geometry_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_1_vina_oracle",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_2_random",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_2_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_2_geometry_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_2_vina_oracle",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_4_random",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_4_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_4_geometry_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_4_vina_oracle",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        }
+      ],
+      "first_source": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s2026_retry1"
+    },
+    {
+      "seed": 12026,
+      "status": "verified",
+      "raw_prefix_candidates": 400,
+      "merged_candidates": 800,
+      "selections": [
+        {
+          "label": "best_of_1_random",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_1_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_1_geometry_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_1_vina_oracle",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_2_random",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_2_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_2_geometry_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_2_vina_oracle",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_4_random",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_4_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_4_geometry_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_4_vina_oracle",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        }
+      ],
+      "first_source": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s12026"
+    },
+    {
+      "seed": 22026,
+      "status": "verified",
+      "raw_prefix_candidates": 400,
+      "merged_candidates": 800,
+      "selections": [
+        {
+          "label": "best_of_1_random",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_1_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_1_geometry_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_1_vina_oracle",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_2_random",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_2_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_2_geometry_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_2_vina_oracle",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_4_random",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_4_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_4_geometry_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_4_vina_oracle",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        }
+      ],
+      "first_source": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s22026"
+    },
+    {
+      "seed": 32026,
+      "status": "verified",
+      "raw_prefix_candidates": 400,
+      "merged_candidates": 800,
+      "selections": [
+        {
+          "label": "best_of_1_random",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_1_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_1_geometry_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_1_vina_oracle",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_2_random",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_2_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_2_geometry_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_2_vina_oracle",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_4_random",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_4_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_4_geometry_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_4_vina_oracle",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        }
+      ],
+      "first_source": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s32026"
+    },
+    {
+      "seed": 42026,
+      "status": "verified",
+      "raw_prefix_candidates": 400,
+      "merged_candidates": 800,
+      "selections": [
+        {
+          "label": "best_of_1_random",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_1_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_1_geometry_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_1_vina_oracle",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_2_random",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_2_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_2_geometry_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_2_vina_oracle",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_4_random",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_4_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_4_geometry_confidence",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        },
+        {
+          "label": "best_of_4_vina_oracle",
+          "identical_selected_sdf": 100,
+          "outputs": 100
+        }
+      ],
+      "first_source": "outputs_test_time_scaling/stage_1/pool_t100_n4_r0_s42026"
+    }
+  ]
+}

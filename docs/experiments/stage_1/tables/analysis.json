@@ -1,0 +1,11 @@
+{
+  "bootstrap_resamples": 5000,
+  "bootstrap_seed": 2026,
+  "cluster": "pocket after seed average",
+  "evaluated_runs": 112,
+  "baseline_matrix_complete": true,
+  "development_matrix_complete": true,
+  "selected_confirmation_complete": true,
+  "missing_or_incomplete_cells": [],
+  "provisional": false
+}

@@ -9,6 +9,7 @@ import copy
 import json
 import sys
 import time
+import hashlib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -50,6 +51,11 @@ def select_candidates(frame, n, ranker):
     pool['_confidence'] = pd.to_numeric(pool.cfd_traj, errors='coerce').fillna(-np.inf)
     if ranker == 'confidence':
         columns, asc = ['_confidence', 'i_repeat'], [False, True]
+    elif ranker == 'random':
+        pool['_random'] = [int.from_bytes(hashlib.sha256(
+            f"{r.data_id}:{getattr(r, 'base_seed', 2026)}:{n}:{r.i_repeat}".encode()).digest()[:8], 'big')
+            for r in pool.itertuples()]
+        columns, asc = ['_random', 'i_repeat'], [True, True]
     elif ranker == 'geometry_confidence':
         columns, asc = ['qualified', 'geometry_score', 'complete', '_confidence', 'i_repeat'], [False, False, False, False, True]
     elif ranker == 'vina_oracle':
@@ -76,21 +82,31 @@ def main():
     out = Path(args.outdir) if args.outdir else root / 'tts_eval'
     out.mkdir(parents=True, exist_ok=True)
     info = pd.read_csv(root / 'gen_info.csv', keep_default_na=False)
+    run_manifest = json.loads((root / 'run.json').read_text())
+    info['base_seed'] = run_manifest['seed']
     if args.num_pockets:
         info = info.loc[info.data_id.isin(info.data_id.drop_duplicates().iloc[:args.num_pockets])]
     if args.max_repeats:
         info = info.loc[pd.to_numeric(info.i_repeat) < args.max_repeats]
     tick = time.perf_counter()
+    cfg = copy.deepcopy(PoseBusters(config='mol').config)
+    if not args.energy:
+        cfg['modules'] = [m for m in cfg['modules'] if m['function'] != 'energy_ratio']
+    candidate_protocol = {
+        'config': cfg, 'pocket_clash_cutoff': 0.75,
+        'checkpoint_sha256': run_manifest['checkpoint_sha256'],
+        'sdf_sha256': {name: hashlib.sha256((root / 'SDF' / name).read_bytes()).hexdigest() for name in info.filename},
+        'protein_sha256': {pid: hashlib.sha256((Path(args.protein_dir) / (pid + '_pro.pdb')).read_bytes()).hexdigest() for pid in info.data_id.unique()},
+    }
     if args.reuse:
+        if json.loads((out / 'candidate_protocol.json').read_text()) != candidate_protocol:
+            raise ValueError('Geometry cache protocol, checkpoint or molecular inputs differ')
         frame = pd.read_csv(out / 'candidate_metrics.csv', keep_default_na=False)
         for col in ['valid', 'complete', 'geometry_pass', 'pocket_no_clash', 'qualified'] + GEOMETRY:
             frame[col] = frame[col].astype(str).str.lower().eq('true')
         if set(zip(frame.data_id, frame.filename)) != set(zip(info.data_id, info.filename)):
             raise ValueError('Cached candidates do not match requested evaluation subset')
     else:
-        cfg = copy.deepcopy(PoseBusters(config='mol').config)
-        if not args.energy:
-            cfg['modules'] = [m for m in cfg['modules'] if m['function'] != 'energy_ratio']
         rows = []
         proteins = {}
         for i, row in enumerate(info.to_dict('records')):
@@ -98,11 +114,21 @@ def main():
             record = dict(row, valid=False, complete=False, geometry_pass=False,
                           pocket_no_clash=False, qualified=False, geometry_score=0,
                           qed=np.nan, n_atoms=np.nan, scaffold='', num_pairwise_clashes=np.nan,
-                          error='')
+                          error='', failure_kind='')
             record.update({col: False for col in GEOMETRY})
             try:
                 mol = Chem.MolFromMolFile(str(root / 'SDF' / row['filename']))
                 if mol is None or row.get('tag') == 'bad':
+                    raw = Chem.MolFromMolFile(str(root / 'SDF' / row['filename']), sanitize=False)
+                    record['failure_kind'] = 'reconstruction_failure'
+                    if raw is not None:
+                        record['n_atoms'] = raw.GetNumHeavyAtoms()
+                        try:
+                            Chem.SanitizeMol(raw)
+                        except Exception as exc:
+                            message = str(exc)
+                            record['failure_kind'] = 'valence' if 'valence' in message.lower() else 'aromatic_bond' if 'kekul' in message.lower() or 'aromatic' in message.lower() else 'sanitization_other'
+                            record['error'] = message
                     raise ValueError('invalid molecule or upstream bad tag')
                 record['valid'] = True
                 record['complete'] = len(Chem.GetMolFrags(mol)) == 1
@@ -136,7 +162,9 @@ def main():
                 record['num_pairwise_clashes'] = int(clash['num_pairwise_clashes'])
                 record['qualified'] = record['complete'] and record['geometry_pass'] and record['pocket_no_clash']
             except Exception as exc:
-                record['error'] = str(exc)
+                record['error'] = record['error'] or str(exc)
+                if not record['failure_kind']:
+                    record['failure_kind'] = 'evaluation_error'
             record['physical_score_seconds'] = time.perf_counter() - candidate_tick
             rows.append(record)
             if (i + 1) % 20 == 0:
@@ -154,11 +182,10 @@ def main():
     frame['ligand_efficiency'] = -frame.vina_score / pd.to_numeric(frame.n_atoms, errors='coerce')
     frame['qualified_vina_le_minus7'] = frame.qualified & frame.vina_score.le(-7)
     frame.to_csv(out / 'candidate_metrics.csv', index=False)
+    (out / 'candidate_protocol.json').write_text(json.dumps(candidate_protocol, indent=2))
     reports = [{'method': 'all_candidates', **summarize(frame)}]
     for n in args.best_of:
-        for ranker in ['confidence', 'geometry_confidence', 'vina_oracle']:
-            if ranker == 'vina_oracle' and not frame.vina_score.notna().any():
-                continue
+        for ranker in ['random', 'confidence', 'geometry_confidence', 'vina_oracle']:
             selection_tick = time.perf_counter()
             selected = select_candidates(frame, n, ranker)
             selector_seconds = time.perf_counter() - selection_tick

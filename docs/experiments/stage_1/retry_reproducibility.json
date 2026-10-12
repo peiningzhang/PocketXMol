@@ -1,0 +1,10 @@
+{
+  "original_completed_csv_candidates": 396,
+  "byte_identical_retry_sdfs": 70,
+  "identical_smiles": 287,
+  "identical_reconstruction_tags": 369,
+  "same_candidate_ids_and_repeat_indices": true,
+  "retry_total_candidates": 400,
+  "sampling_bitwise_deterministic": false,
+  "interpretation": "Same prescribed seeds and candidate identities do not produce bitwise-identical molecules. The specific source is not yet isolated; small confidence differences are consistent with GPU numerical nondeterminism. Abandoned attempt is never pooled or used to choose outputs; the first completed retry after the verified reconstruction bug is authoritative."
+}

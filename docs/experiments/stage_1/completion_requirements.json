@@ -1,0 +1,180 @@
+{
+  "objective": "Complete plan.md Stage 1 without training or checkpoint modification",
+  "complete_requires_all": [
+    {
+      "id": "protocol",
+      "requirement": "100 IDs, development20/confirmation80, five seeds, metrics/thresholds/rankers/failed denominators frozen",
+      "evidence": [
+        "protocol.json",
+        "pocket_ids.txt",
+        "development_ids.txt",
+        "confirmation_ids.txt"
+      ]
+    },
+    {
+      "id": "checkpoint",
+      "requirement": "Original teacher checkpoint unchanged; configs, code, environments, GPU and batch size recorded",
+      "evidence": [
+        "*/run.json",
+        "source_snapshot*",
+        "environment/*"
+      ]
+    },
+    {
+      "id": "core_matrix",
+      "requirement": "All 40 baseline generation tasks complete; 7000 planned candidates; actual calls recorded; NFE around1.8M with native early stopping reported",
+      "evidence": [
+        "generation_ledger.json",
+        "*/DONE",
+        "*/gen_info.csv",
+        "*/run.json"
+      ]
+    },
+    {
+      "id": "core_evaluation",
+      "requirement": "All core candidates independently scored for five geometry checks, pocket clashes, energy50/100/seed42, as-generated Vina; missing causes retained",
+      "evidence": [
+        "*/EVALUATED",
+        "*/tts_eval/candidate_metrics.csv",
+        "*/tts_eval/energy_candidates.csv",
+        "*/vina.csv",
+        "*/tts_eval/*protocol.json"
+      ]
+    },
+    {
+      "id": "nested_pools",
+      "requirement": "Exact same raw pool prefixes N1/2/4/8; no duplicate streams or budget-changing replacement; source/checkpoint/cache provenance verified",
+      "evidence": [
+        "pool_t100_n8*/run.json",
+        "*/tts_eval/best_of*.csv",
+        "*/tts_eval/*protocol.json"
+      ]
+    },
+    {
+      "id": "development",
+      "requirement": "Two bounded families, original20 pockets/three seeds, FK8 configurations and partial4 configurations; full state/context invariants, weights/ESS/ancestors/diversity",
+      "evidence": [
+        "development/development_manifest.json",
+        "development/adaptation_ledger.json",
+        "development/*/particle_diagnostics.json",
+        "development/*/partial_diagnostics.json"
+      ]
+    },
+    {
+      "id": "confirmation_freeze",
+      "requirement": "At most2 configs selected only from development; immutable criteria/parameters/code before confirmation",
+      "evidence": [
+        "confirmation/confirmation_manifest.json"
+      ]
+    },
+    {
+      "id": "confirmation",
+      "requirement": "Chosen configs at B400 and adjacent800 on confirmation80/five seeds; corresponding baseline reuse; no further reward tuning",
+      "evidence": [
+        "confirmation/confirmation_ledger.json",
+        "confirmation/*/EVALUATED"
+      ]
+    },
+    {
+      "id": "full100",
+      "requirement": "Development/confirmation reported separately and full100 summaries; fill frozen selected-method development cells to allfive seeds without retuning",
+      "evidence": [
+        "development_extensions/extension_ledger.json",
+        "tables/budget_curves.csv"
+      ]
+    },
+    {
+      "id": "paired_statistics",
+      "requirement": "Seed means within pocket, paired deltas and pocket-cluster bootstrap95CI >=5000; all planned failures retained",
+      "evidence": [
+        "tables/per_pocket_seed_selections.csv",
+        "tables/paired_comparisons.csv",
+        "tables/analysis.json"
+      ]
+    },
+    {
+      "id": "coverage_selection",
+      "requirement": "Confidence, geometry, Vina and random comparisons; candidate oracle/gap; confidence correlation/reliability; -6/-8 sensitivity",
+      "evidence": [
+        "tables/pool_oracle.csv",
+        "tables/oracle_gap.csv",
+        "tables/confidence_correlations.csv",
+        "tables/confidence_reliability.csv",
+        "tables/budget_curves.csv"
+      ]
+    },
+    {
+      "id": "physical_failure_analysis",
+      "requirement": "Geometry components, energy distributions/coverage/causes, pocket and heavyatom-normalized clashes, valence/aromatic/reconstruction counts; complete-conditional checks",
+      "evidence": [
+        "tables/component_failures.csv",
+        "tables/chemical_failure_counts.csv",
+        "tables/all_candidates.csv"
+      ]
+    },
+    {
+      "id": "diversity_size",
+      "requirement": "QED, molecule sizes, ligand efficiency, SMILES/scaffolds and withinpool fingerprints/duplicates; selected-method guardrail/stratified analyses",
+      "evidence": [
+        "tables/pool_diversity.csv",
+        "tables/budget_curves.csv",
+        "tables/per_pocket_seed_selections.csv"
+      ]
+    },
+    {
+      "id": "timing",
+      "requirement": "Actual NFE, total generation incl reconstruction/data/I/O, selector and verifier costs; startup/warmup/receptor prep independent; repeated samebatch/hardware timing",
+      "evidence": [
+        "*/run.json",
+        "*/vina.csv.protocol.json",
+        "tables/budget_curves.csv",
+        "timing/*"
+      ]
+    },
+    {
+      "id": "repair_damage",
+      "requirement": "Saved successful repair and introduced-error examples, atom/coordinate/bond attribution; exact context/pocket preservation verified",
+      "evidence": [
+        "development/*/diagnostic_states/*",
+        "tables/*repair_damage*.csv",
+        "development/*/partial_diagnostics.json"
+      ]
+    },
+    {
+      "id": "figures",
+      "requirement": "Pphys/Pjoint against actual NFE and total search time with paired CIs; component failures",
+      "evidence": [
+        "figures/*"
+      ]
+    },
+    {
+      "id": "resource_recovery",
+      "requirement": "SSH GPU execution, aggregate<=48 charged GPUhours, independent logs, valid done/retry recovery, no raw deletion; outputsize policy",
+      "evidence": [
+        "progress.csv",
+        "*ledger.json",
+        "progress.md",
+        "retry_reproducibility.json"
+      ]
+    },
+    {
+      "id": "report",
+      "requirement": "Final report, boundaries and negative findings, stage2 criteria1/2/3 and guardrails audited; minimal validation if evidence insufficient",
+      "evidence": [
+        "report.md",
+        "method_notes.md"
+      ]
+    },
+    {
+      "id": "conditional_n16",
+      "requirement": "Inspect B800 vsB400 deployed-method trend. If a clear positive trend warrants N16/B1600, use a small predefined subset with corresponding1600-step/native-refinement controls; otherwise record no expansion rationale.",
+      "evidence": [
+        "tables/paired_budget_differences.csv",
+        "report.md",
+        "extension_1600/* if triggered"
+      ]
+    }
+  ],
+  "current_status": "complete; all 19 plan requirements verified against live files/results, 27 automated necessary checks pass, and final report/plots received manual evidence review",
+  "completion_review": "completion_evidence_review.json"
+}

@@ -1,0 +1,6 @@
+{
+  "display_transform": "sigmoid of raw teacher position confidence; monotone visualization only",
+  "calibrated_success_probability": false,
+  "bins": "fixed ten equal sigmoid-display bins, not fit to confirmation outcomes",
+  "aggregation": "candidate-weighted diagnostic across formal evaluated runs; not a fitted deployment calibration model"
+}

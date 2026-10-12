@@ -1,0 +1,27 @@
+{
+  "source": "plan.md section7; unchanged operational thresholds",
+  "subset": "confirmation80, all five seeds",
+  "reference": "geometry_confidence at matching actual graph NFE",
+  "quality_criterion": {
+    "primary_gain_min": 0.05,
+    "paired_ci_lower_strictly_above": 0,
+    "other_primary_max_decline": 0.02
+  },
+  "cost_criterion": {
+    "max_absolute_primary_point_difference": 0.02,
+    "min_search_cost_reduction": 0.2,
+    "repeated_trials": 3,
+    "require_common_trace_control": true,
+    "include_search_verifier_cost": true
+  },
+  "mechanism_criterion": "Reproducible variable/noise-stage difference, a specific repair target and at least one effective validated control; must be assessed from direct evidence, not inferred from a mean gain",
+  "guardrails": {
+    "max_validity_decline": 0.03,
+    "max_complete_decline": 0.03,
+    "assess_size_stratification": true,
+    "assess_coverage": true,
+    "assess_diversity_and_FK_ancestors": true
+  },
+  "insufficient_evidence": "Report negative or inconclusive result and one minimal validation experiment; do not expand backbone or retune rewards",
+  "current_decision": "not evaluated; pending full confirmation, repeated timing and guardrail evidence"
+}
